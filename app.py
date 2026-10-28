@@ -1,56 +1,57 @@
 import streamlit as st
+import time
 
 st.set_page_config(page_title="Aziz Digital Marketing Agent", page_icon="🚀")
 st.title("🚀 Aziz Digital Marketing Agent")
-st.write("Free AI Agent for Client Research, Internet Research & Facebook Content")
+st.write("*Auto Cloud Agent - So jao to soye, Utho to uthe!*")
 st.divider()
 
+# Input
 business = st.text_input("Client ka Business Name likho:", placeholder="e.g. Peshawar Shawarma House")
-research_type = st.selectbox("Kya kaam karna hai?", ["Client Research", "Facebook Content", "WhatsApp Pitch", "Full Pro Report (Sab Kuch)"])
+research_type = st.selectbox("Kya kaam karna hai?", ["Client Research", "Facebook Content", "WhatsApp Pitch"])
 
-if st.button("Research Shuru Karo ✨"):
+if st.button("Research Shuru Karo 🚀"):
     if business == "":
         st.warning("Pehle Business Name to likho Aziz Bhai!")
     else:
+        with st.spinner('Cloud Agent kaam kar raha hai...'):
+            time.sleep(2)
+        
         name = business.lower()
-        if any(x in name for x in ["shawarma","burger","food","pizza","restaurant"]):
+        
+        # --- LOGIC FOR DUNU ---
+        if any(x in name for x in ["shawarma","burger","food","pizza","restaurant", "cafe", "hotel"]):
             niche="Food / Restaurant"
             audience="18-35, Students, Food Lovers, University Road Peshawar"
             platform="Facebook, Instagram, TikTok, Foodpanda"
-            competitors="Chashnagheer, Jalil & Sons, Peshawar Confectionary"
-            strategy="Daily 1 Reel (Making), 2 Stories (Offer), Customer Reviews"
-            posts=[f"🔥 {business} ka Special Zinger - Sirf Rs.350!", f"😋 Bhook lagi hai? {business} se 30 min me delivery!", f"📸 Best Shawarma in Peshawar - {business}"]
-        elif any(x in name for x in ["cloth","fashion","boutique","garments","shoes"]):
-            niche="Clothes / Fashion"
-            audience="18-40, Ladies & Gents, Shaadi Season, Peshawar"
-            platform="Facebook, Instagram, TikTok Shop"
-            competitors="Khaadi, Bonanza, Local Garments"
-            strategy="Daily 1 Outfit Photo, Live Weekly"
-            posts=[f"👗 New Winter Collection - {business} par Discount!", f"✨ Shaadi Season Offer - {business}", f"🔥 Buy 2 Get 1 Free - {business}"]
+            content_idea = f"1. Spicy Shawarma Challenge Video\n2. Behind the scenes - {business} ki kitchen\n3. Customer Review Post"
+        elif any(x in name for x in ["boutique","fashion","cloth","ladies","abaya","dress"]):
+            niche="Fashion / Boutique"
+            audience="18-40, Females, Peshawar, Charsadda"
+            platform="Instagram, Facebook, WhatsApp Status"
+            content_idea = f"1. New Collection Reel - {business}\n2. Price & Design Post\n3. Eid Offer Story"
         else:
             niche="General Business"
-            audience="18-45, Local Peshawar"
+            audience="18-45, Local Peshawar Audience"
             platform="Facebook & Instagram"
-            competitors="Top 3 Local Pages"
-            strategy="Daily 1 Post + 2 Stories"
-            posts=[f"🚀 {business} - Behtareen Quality!", f"🔥 Special Offer - {business}", f"❤️ Customer Love - {business}"]
+            content_idea = f"1. Introduction Post for {business}\n2. Services List\n3. Contact Us Post"
 
-        st.success(f"{business} ke liye Report tayyar hai!")
-        st.markdown(f"### Research Report for {business}")
-        st.markdown(f"*Niche:* {niche}")
-        st.write(f"*Target Audience:* {audience}")
-        st.write(f"*Best Platform:* {platform}")
-        st.write(f"*Competitors:* {competitors}")
-        st.write(f"*Content Strategy:* {strategy}")
-
-        if research_type in ["Facebook Content", "Full Pro Report (Sab Kuch)"]:
-            st.divider()
-            st.markdown("### 📱 Facebook Posts:")
-            for p in posts:
-                st.info(p)
+        st.success(f"Research Report for {business} - READY!")
         
-        if research_type in ["WhatsApp Pitch", "Full Pro Report (Sab Kuch)"]:
-            st.divider()
-            st.markdown("### 💬 WhatsApp Pitch:")
-            pitch = f"As-salamu Alaikum! {business} Owner\n\nMaine aap ke liye Free Research ki hai.\nTarget: {audience}\nPlatform: {platform}\n\nKya 5 min Free Call ho sakti hai? - Aziz"
-            st.code(pitch)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info(f"*Niche:* {niche}\n\n*Audience:* {audience}\n\n*Best Platform:* {platform}")
+        with col2:
+            st.warning(f"*Content Plan:*\n{content_idea}")
+
+        # --- WHATSAPP CLOUD FEATURE ---
+        st.divider()
+        st.subheader("📱 WhatsApp Cloud Agent")
+        wa_message = f"Salam Sir! Apke business {business} ki research ho gayi. Niche: {niche}. Audience: {audience}. Best Platform: {platform}. Kya me pura 30 din ka plan bana dun? - Aziz Digital Marketing"
+        
+        # Ye link client ko direct WhatsApp pe le jayega
+        wa_link = f"https://wa.me/?text={wa_message.replace(' ', '%20')}"
+        st.write("Ye message copy karke client ko bhejo, ya neeche button dabao:")
+        st.code(wa_message)
+        st.link_button("WhatsApp Pe Bhejo 🚀", wa_link)
+
