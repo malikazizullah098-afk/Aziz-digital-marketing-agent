@@ -1,4 +1,3 @@
-
 """Aziz AI Marketing Cloud Agent.
 
 A Streamlit tool that turns a business name into a niche research summary,
@@ -10,10 +9,13 @@ from __future__ import annotations
 import csv
 import hmac
 import io
+import json
 import os
 import re
 import time
+import urllib.error
 import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -658,10 +660,13 @@ CUSTOM_CSS = """
 # UI helpers
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
-# AI agent (Claude). Key and password live in Streamlit Secrets, never in GitHub.
+# AI agent. Gemini (free key) or Claude (paid key). Keys and password live in Streamlit Secrets, never in GitHub.
 # ---------------------------------------------------------------------------
-AI_MODEL_DEFAULT = "claude-sonnet-5-5"
+AI_MODEL_DEFAULT = "claude-sonnet-5-5"      # Claude model
+GEMINI_MODEL_DEFAULT = "gemini-flash-latest"  # Gemini alias; auto-discovers a flash model if missing
 AI_MAX_TOKENS = 1400
+GEMINI_MAX_TOKENS = 3000  # Gemini counts its internal thinking inside this budget
+GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
 AI_DAILY_LIMIT_DEFAULT = 30  # total AI calls per day for the whole app (cost cap)
 
 AI_SYSTEM = (
@@ -700,40 +705,99 @@ def ai_unlocked() -> bool:
     return not pw or st.session_state.get("ai_ok", False)
 
 
-def call_claude(prompt: str, history: list[tuple[str, str]] | None = None) -> str:
-    """Send one request to Claude. Returns text, or a friendly Roman Urdu error message."""
-    key = get_secret("ANTHROPIC_API_KEY")
-    if not key:
-        return "AI key set nahi hai. Streamlit Secrets mein ANTHROPIC_API_KEY daalein."
-    if ai_calls_left() <= 0:
-        return "Aaj ki AI limit poori ho gayi. Kal dobara try karein."
+def _gemini_request(url: str, key: str, body: dict | None = None) -> dict:
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, method="POST" if body is not None else "GET",
+                                 headers={"x-goog-api-key": key, "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.loads(resp.read().decode())
+
+
+def _gemini_find_model(key: str) -> str | None:
+    """Ask Google which models this key can use and pick a normal text 'flash' model."""
+    models = _gemini_request(f"{GEMINI_BASE}/models?pageSize=200", key).get("models", [])
+    bad = ("image", "tts", "live", "embed", "audio", "robotics", "computer", "thinking", "vision", "aqa")
+    names = [m["name"].split("/")[-1] for m in models
+             if "generateContent" in m.get("supportedGenerationMethods", [])]
+    flash = [n for n in names if "flash" in n and not any(b in n for b in bad)]
+    stable = [n for n in flash if "preview" not in n and "exp" not in n and "lite" not in n]
+    for group in (stable, flash):
+        if group:
+            return sorted(group)[-1]
+    return None
+
+
+def call_gemini(prompt: str, history: list[tuple[str, str]] | None, key: str) -> str:
+    contents = []
+    for q, a in (history or [])[-4:]:
+        contents += [{"role": "user", "parts": [{"text": q}]}, {"role": "model", "parts": [{"text": a}]}]
+    contents.append({"role": "user", "parts": [{"text": prompt}]})
+    body = {"systemInstruction": {"parts": [{"text": AI_SYSTEM}]}, "contents": contents,
+            "generationConfig": {"maxOutputTokens": GEMINI_MAX_TOKENS}}
+    model = str(get_secret("GEMINI_MODEL", GEMINI_MODEL_DEFAULT))
     try:
-        import anthropic
-    except ImportError:
-        return "anthropic package install nahi hai. requirements.txt mein 'anthropic' likhein."
+        data = _gemini_request(f"{GEMINI_BASE}/models/{model}:generateContent", key, body)
+    except urllib.error.HTTPError as err:
+        if err.code != 404:
+            raise
+        alt = _gemini_find_model(key)  # configured model name does not exist: find one that does
+        if not alt:
+            raise
+        data = _gemini_request(f"{GEMINI_BASE}/models/{alt}:generateContent", key, body)
+    parts = (data.get("candidates") or [{}])[0].get("content", {}).get("parts", [])
+    return "".join(p.get("text", "") for p in parts).strip()
+
+
+def call_claude_api(prompt: str, history: list[tuple[str, str]] | None, key: str) -> str:
+    import anthropic
 
     messages = []
     for q, a in (history or [])[-4:]:
         messages += [{"role": "user", "content": q}, {"role": "assistant", "content": a}]
     messages.append({"role": "user", "content": prompt})
+    resp = anthropic.Anthropic(api_key=key).messages.create(
+        model=str(get_secret("AI_MODEL", AI_MODEL_DEFAULT)), max_tokens=AI_MAX_TOKENS,
+        system=AI_SYSTEM, messages=messages)
+    return "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
+
+
+def ai_provider() -> str | None:
+    if get_secret("GEMINI_API_KEY"):
+        return "gemini"
+    if get_secret("ANTHROPIC_API_KEY"):
+        return "claude"
+    return None
+
+
+def call_ai(prompt: str, history: list[tuple[str, str]] | None = None) -> str:
+    """Send one request to the configured AI. Returns text, or a friendly Roman Urdu error message."""
+    provider = ai_provider()
+    if not provider:
+        return "AI key set nahi hai. Streamlit Secrets mein GEMINI_API_KEY daalein."
+    if ai_calls_left() <= 0:
+        return "Aaj ki AI limit poori ho gayi. Kal dobara try karein."
     try:
-        client = anthropic.Anthropic(api_key=key)
-        resp = client.messages.create(
-            model=str(get_secret("AI_MODEL", AI_MODEL_DEFAULT)),
-            max_tokens=AI_MAX_TOKENS,
-            system=AI_SYSTEM,
-            messages=messages,
-        )
+        if provider == "gemini":
+            text = call_gemini(prompt, history, str(get_secret("GEMINI_API_KEY")))
+        else:
+            text = call_claude_api(prompt, history, str(get_secret("ANTHROPIC_API_KEY")))
         _usage()["n"] += 1
-        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
-        return text or "AI ne khali jawab diya, dobara try karein."
-    except Exception as exc:  # network, auth, billing, rate limit ...
+        return text or "AI ne khali jawab diya (shayad filter ho gaya), sawal badal kar dobara try karein."
+    except urllib.error.HTTPError as exc:
+        if exc.code in (400, 401, 403):
+            return "API key galat ya band hai. Secrets mein key dobara check karein."
+        if exc.code == 429:
+            return "AI ki free limit abhi poori hai (rate limit). Thori der baad try karein."
+        return f"AI se jawab nahi mila (HTTP {exc.code}). Thori der baad try karein."
+    except ImportError:
+        return "anthropic package install nahi hai. requirements.txt mein 'anthropic' likhein."
+    except Exception as exc:  # network, billing, rate limit ...
         name = type(exc).__name__
         if "Authentication" in name:
             return "API key galat hai. Secrets mein key dobara check karein."
         if "RateLimit" in name:
             return "AI abhi masroof hai (rate limit). Thori der baad try karein."
-        return f"AI se jawab nahi mila ({name}). Billing/credits aur internet check karein."
+        return f"AI se jawab nahi mila ({name}). Internet ya key check karein."
 
 
 def strategy_prompt(r: Report) -> str:
@@ -751,8 +815,8 @@ def strategy_prompt(r: Report) -> str:
 
 
 def render_ai_tab(r: Report) -> None:
-    if not get_secret("ANTHROPIC_API_KEY"):
-        st.info("AI agent abhi band hai. Streamlit Secrets mein ANTHROPIC_API_KEY daalte hi yeh chal jayega.")
+    if not ai_provider():
+        st.info("AI agent abhi band hai. Streamlit Secrets mein GEMINI_API_KEY daalte hi yeh chal jayega.")
         return
 
     if not ai_unlocked():
@@ -770,7 +834,7 @@ def render_ai_tab(r: Report) -> None:
 
     if st.button("🤖 Is business ki poori strategy likho", type="primary", key="ai_strategy"):
         with st.spinner("AI soch raha hai..."):
-            answer = call_claude(strategy_prompt(r))
+            answer = call_ai(strategy_prompt(r))
         chat.append((f"Strategy: {r.business}", answer))
 
     question = st.text_area("Kuch bhi poochein (captions, ad idea, client ko jawab...):", key="ai_q", height=90,
@@ -779,7 +843,7 @@ def render_ai_tab(r: Report) -> None:
         if question.strip():
             ctx = f"Business: {r.business}, niche: {r.niche.name}, city: {r.city}.\n\n{question.strip()}"
             with st.spinner("AI soch raha hai..."):
-                answer = call_claude(ctx, chat)
+                answer = call_ai(ctx, chat)
             chat.append((question.strip(), answer))
         else:
             st.warning("Pehle sawal likhein.")
