@@ -1,3 +1,4 @@
+
 """Aziz AI Marketing Cloud Agent.
 
 A Streamlit tool that turns a business name into a niche research summary,
@@ -360,95 +361,222 @@ def create_report(business: str, city: str, budget: int, lang: str, client_raw: 
 
 
 # ---------------------------------------------------------------------------
-# 3D hero banner (Three.js). Static markup only: no user input is injected.
+# 3D hero banner (Three.js, PBR glass + chrome). Static markup only: no user input is injected.
 # ---------------------------------------------------------------------------
 HERO_HTML = """
 <style>
-  html,body{margin:0;height:100%;background:transparent;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-  #wrap{position:relative;height:100%;border-radius:18px;overflow:hidden;
-        background:radial-gradient(120% 140% at 80% 0%,#2b1b6b 0%,#14103a 55%,#0b0a22 100%)}
-  canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-  .txt{position:absolute;left:32px;top:50%;transform:translateY(-50%);color:#fff;max-width:56%;z-index:2}
-  .txt h1{margin:0 0 8px;font-size:clamp(20px,3.2vw,34px);line-height:1.15;letter-spacing:-.5px}
-  .txt p{margin:0;color:#c9c6ee;font-size:clamp(12px,1.5vw,15px)}
-  .pill{display:inline-block;margin-top:14px;padding:5px 12px;border-radius:999px;font-size:12px;
-        background:rgba(120,255,190,.14);color:#7dffbf;border:1px solid rgba(125,255,191,.35)}
-  @media(max-width:600px){.txt{max-width:88%;left:18px}}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:transparent;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  #wrap{position:relative;height:100%;border-radius:20px;overflow:hidden;
+        background:
+          radial-gradient(60% 90% at 78% 45%,rgba(124,92,255,.35) 0%,rgba(124,92,255,0) 70%),
+          radial-gradient(40% 60% at 95% 100%,rgba(0,255,200,.18) 0%,rgba(0,255,200,0) 70%),
+          linear-gradient(135deg,#0d0a26 0%,#14103a 50%,#080718 100%);
+        box-shadow:inset 0 0 0 1px rgba(255,255,255,.07),0 20px 60px rgba(40,20,120,.35)}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block;opacity:0;transition:opacity 1.2s ease}
+  canvas.on{opacity:1}
+  .txt{position:absolute;left:34px;top:50%;transform:translateY(-50%);color:#fff;max-width:50%;z-index:2}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-size:14px;
+        letter-spacing:.4px;color:#9dffd2;background:rgba(120,255,190,.10);border:1px solid rgba(125,255,191,.30);
+        backdrop-filter:blur(8px)}
+  .dot{width:7px;height:7px;border-radius:50%;background:#5dffb0;box-shadow:0 0 10px #5dffb0;animation:p 1.6s infinite}
+  @keyframes p{50%{opacity:.35}}
+  h1{margin:14px 0 10px;font-size:clamp(30px,4.8vw,56px);line-height:1.1;letter-spacing:-.8px;font-weight:800;
+        background:linear-gradient(90deg,#fff 0%,#cfc6ff 45%,#7dffd0 100%);-webkit-background-clip:text;background-clip:text;
+        color:transparent}
+  p{margin:0;color:#d6d2f5;font-size:clamp(15px,1.9vw,20px);line-height:1.45}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .chip{padding:7px 14px;border-radius:10px;font-size:14px;color:#e9e6ff;background:rgba(255,255,255,.06);
+        border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px)}
+  @media(max-width:640px){.txt{left:18px;right:18px;max-width:none;top:18px;transform:none}h1{margin:10px 0 6px}.chips{display:none}}
 </style>
 <div id="wrap">
   <canvas id="c"></canvas>
   <div class="txt">
-    <h1>🚀 Aziz AI Marketing Cloud Agent</h1>
+    <span class="eyebrow"><span class="dot"></span>Cloud LIVE</span>
+    <h1>Aziz AI Marketing<br>Cloud Agent</h1>
     <p>Research, 30-day content plan aur WhatsApp pitch, ek minute mein.</p>
-    <span class="pill">● Cloud LIVE</span>
+    <div class="chips"><span class="chip">11 Niches</span><span class="chip">30-Day Plan</span><span class="chip">WhatsApp Pitch</span></div>
   </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function () {
-  if (typeof THREE === 'undefined') { return; }           // CDN blocked: gradient banner only
-  var wrap = document.getElementById('wrap');
-  var canvas = document.getElementById('c');
-  var renderer;
-  try { renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true }); }
-  catch (e) { return; }                                   // no WebGL: gradient banner only
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  if (typeof THREE === 'undefined') { return; }            // CDN blocked: gradient banner only
+  var wrap = document.getElementById('wrap'), canvas = document.getElementById('c'), renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true, powerPreference: 'high-performance' }); }
+  catch (e) { return; }                                    // no WebGL: gradient banner only
+
+  var small = Math.min(window.screen.width || 1000, window.innerWidth) < 700;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.5 : 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
 
   var scene = new THREE.Scene();
-  var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-  camera.position.z = 7;
+  var camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+  camera.position.set(0, 0, 6.3);
 
-  scene.add(new THREE.AmbientLight(0x8877ff, 0.6));
-  var key = new THREE.PointLight(0x66ffcc, 1.2, 40); key.position.set(5, 4, 6); scene.add(key);
-  var rim = new THREE.PointLight(0xff66cc, 1.0, 40); rim.position.set(-5, -3, 4); scene.add(rim);
+  // ---- Studio environment: gives real reflections on glass and chrome --------
+  (function buildEnv() {
+    var env = new THREE.Scene();
+    env.add(new THREE.Mesh(new THREE.SphereGeometry(20, 32, 16),
+      new THREE.MeshBasicMaterial({ color: 0x0b0a22, side: THREE.BackSide })));
+    function panel(color, intensity, w, h, x, y, z) {
+      var m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), side: THREE.DoubleSide }));
+      m.position.set(x, y, z); m.lookAt(0, 0, 0); env.add(m);
+    }
+    panel(0xffffff, 6, 10, 3, 0, 12, 4);        // top softbox
+    panel(0x66ffd0, 5, 3, 10, 12, 0, 2);        // teal strip right
+    panel(0xff5fd2, 4, 3, 10, -12, 2, 2);       // magenta strip left
+    panel(0x7c5cff, 4, 12, 3, 0, -10, 6);       // violet floor bounce
+    panel(0xffffff, 3, 5, 5, 0, 2, 14);         // front fill
+    var pm = new THREE.PMREMGenerator(renderer);
+    scene.environment = pm.fromScene(env, 0.02).texture;
+    pm.dispose();
+  })();
 
-  var knot = new THREE.Mesh(
-    new THREE.TorusKnotGeometry(1.15, 0.38, 180, 24),
-    new THREE.MeshStandardMaterial({ color: 0x7c5cff, metalness: 0.6, roughness: 0.25 })
-  );
-  var wire = new THREE.Mesh(
-    new THREE.TorusKnotGeometry(1.5, 0.05, 120, 8),
-    new THREE.MeshBasicMaterial({ color: 0x66ffcc, wireframe: true, transparent: true, opacity: 0.35 })
-  );
-  var group = new THREE.Group(); group.add(knot); group.add(wire); scene.add(group);
+  // ---- Lights -----------------------------------------------------------------
+  scene.add(new THREE.AmbientLight(0x6655ff, 0.25));
+  var key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(4, 5, 6); scene.add(key);
+  var teal = new THREE.PointLight(0x4dffc9, 2.2, 30); teal.position.set(5, -1, 3); scene.add(teal);
+  var pink = new THREE.PointLight(0xff4fc8, 2.0, 30); pink.position.set(-5, 2, 3); scene.add(pink);
 
-  var COUNT = 260, pos = new Float32Array(COUNT * 3);
-  for (var i = 0; i < COUNT * 3; i++) { pos[i] = (Math.random() - 0.5) * 16; }
-  var geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  var stars = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.045, transparent: true, opacity: 0.8 }));
-  scene.add(stars);
+  var group = new THREE.Group(); scene.add(group);
 
-  var mx = 0, my = 0;
-  window.addEventListener('mousemove', function (e) {
-    mx = (e.clientX / window.innerWidth - 0.5) * 2;
-    my = (e.clientY / window.innerHeight - 0.5) * 2;
+  // ---- Glow sprite texture ----------------------------------------------------
+  function glowTex(inner, outer) {
+    var c = document.createElement('canvas'); c.width = c.height = 128;
+    var g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0, inner); gr.addColorStop(0.35, outer); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    return new THREE.CanvasTexture(c);
+  }
+
+  // ---- Core: liquid glass shell + glowing nucleus -------------------------------
+  var SEG = small ? 48 : 80;
+  var shellGeo = new THREE.SphereGeometry(1.35, SEG, SEG);
+  var base = shellGeo.attributes.position.array.slice();
+  var shell = new THREE.Mesh(shellGeo, new THREE.MeshPhysicalMaterial({
+    color: 0x4a2ee0, metalness: 0.25, roughness: 0.06, transmission: 0.62, thickness: 2.0, ior: 1.5,
+    clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.6, attenuationColor: new THREE.Color(0x3b1fd0),
+    attenuationDistance: 1.4, transparent: true
+  }));
+  group.add(shell);
+
+  var nucleus = new THREE.Mesh(new THREE.IcosahedronGeometry(0.62, 2),
+    new THREE.MeshStandardMaterial({ color: 0x0b2a2a, emissive: 0x19e6a8, emissiveIntensity: 1.0, metalness: 0.2, roughness: 0.35, flatShading: true }));
+  group.add(nucleus);
+
+  var lattice = new THREE.Mesh(new THREE.IcosahedronGeometry(0.98, 1),
+    new THREE.MeshBasicMaterial({ color: 0x9ffff0, wireframe: true, transparent: true, opacity: 0.28 }));
+  group.add(lattice);
+
+  var halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex('rgba(150,120,255,.9)', 'rgba(110,70,255,.25)'),
+    blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.8 }));
+  halo.scale.set(7.5, 7.5, 1); halo.position.z = -1.2; group.add(halo);
+
+  // ---- Chrome / gold rings ------------------------------------------------------
+  function ring(radius, tube, color, rx, ry) {
+    var m = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 32, 160),
+      new THREE.MeshPhysicalMaterial({ color: color, metalness: 1, roughness: 0.14, clearcoat: 1, envMapIntensity: 1.8 }));
+    m.rotation.set(rx, ry, 0); group.add(m); return m;
+  }
+  var ringA = ring(1.95, 0.035, 0xe9e6ff, 1.2, 0.2);
+  var ringB = ring(2.35, 0.025, 0x6dffd0, 0.4, 1.0);
+  var ringC = ring(2.75, 0.018, 0xffc46b, 2.1, 0.6);
+
+  // ---- Orbiting gems (stand for platforms) -----------------------------------------
+  var gemColors = [0x4dffc9, 0xff5fd2, 0xffc46b, 0x7cc4ff, 0xb59cff];
+  var gems = gemColors.map(function (col, i) {
+    var m = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0),
+      new THREE.MeshPhysicalMaterial({ color: col, emissive: col, emissiveIntensity: 0.55, metalness: 0.3, roughness: 0.12, clearcoat: 1 }));
+    m.userData = { r: 2.2 + (i % 3) * 0.4, s: 0.5 + i * 0.13, o: i * 1.26, tilt: 0.35 * (i - 2) };
+    group.add(m); return m;
   });
+
+  // ---- Particles --------------------------------------------------------------------
+  var N = small ? 160 : 320, pos = new Float32Array(N * 3), seed = new Float32Array(N);
+  for (var i = 0; i < N; i++) {
+    pos[i * 3] = (Math.random() - 0.5) * 18; pos[i * 3 + 1] = (Math.random() - 0.5) * 9; pos[i * 3 + 2] = (Math.random() - 0.5) * 10 - 2;
+    seed[i] = Math.random() * 6.28;
+  }
+  var pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  var dust = new THREE.Points(pg, new THREE.PointsMaterial({ map: glowTex('rgba(255,255,255,1)', 'rgba(180,170,255,.4)'),
+    size: 0.16, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
+  scene.add(dust);
+
+  // ---- Interaction ---------------------------------------------------------------------
+  var tx = 0, ty = 0, cx = 0, cy = 0;
+  function aim(x, y) { tx = (x / window.innerWidth - 0.5) * 2; ty = (y / window.innerHeight - 0.5) * 2; }
+  window.addEventListener('mousemove', function (e) { aim(e.clientX, e.clientY); });
+  window.addEventListener('touchmove', function (e) { if (e.touches[0]) aim(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
 
   function resize() {
     var w = wrap.clientWidth, h = wrap.clientHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
-    group.position.x = w > 600 ? 2.6 : 0;                 // knot on the right for wide screens
-    group.scale.setScalar(w > 600 ? 1 : 0.8);
+    var wide = w > 640;
+    group.position.x = wide ? 3.35 : 1.0; group.position.y = wide ? 0 : -1.45;
+    group.scale.setScalar(wide ? 0.82 : 0.42);
   }
   window.addEventListener('resize', resize); resize();
 
+  // ---- Animation ---------------------------------------------------------------------------
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var t0 = performance.now();
-  function frame(now) {
-    var t = (now - t0) / 1000;
-    knot.rotation.x = t * 0.45; knot.rotation.y = t * 0.6;
-    wire.rotation.x = -t * 0.25; wire.rotation.z = t * 0.3;
-    group.position.y = Math.sin(t * 1.1) * 0.12;
-    stars.rotation.y = t * 0.03;
-    camera.position.x += (mx * 0.6 - camera.position.x) * 0.04;
-    camera.position.y += (-my * 0.4 - camera.position.y) * 0.04;
-    camera.lookAt(0, 0, 0);
-    renderer.render(scene, camera);
-    if (!reduce) { requestAnimationFrame(frame); }
+  var visible = true, running = false, t0 = performance.now();
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(function (en) { visible = en[0].isIntersecting; if (visible) start(); }).observe(wrap);
   }
-  requestAnimationFrame(frame);
+  function ease(x) { return 1 - Math.pow(1 - x, 3); }
+
+  function wobble(t) {
+    var p = shellGeo.attributes.position.array;
+    for (var i = 0; i < p.length; i += 3) {
+      var x = base[i], y = base[i + 1], z = base[i + 2];
+      var d = 1 + 0.07 * Math.sin(x * 2.1 + t * 1.1) * Math.cos(y * 2.3 - t * 0.9) + 0.05 * Math.sin(z * 3.0 + t * 1.4);
+      p[i] = x * d; p[i + 1] = y * d; p[i + 2] = z * d;
+    }
+    shellGeo.attributes.position.needsUpdate = true;
+    shellGeo.computeVertexNormals();
+  }
+
+  function frame(now) {
+    running = false;
+    var t = reduce ? 10 : (now - t0) / 1000, intro = ease(Math.min(t / 1.6, 1));
+    cx += (tx - cx) * 0.05; cy += (ty - cy) * 0.05;
+
+    group.rotation.y = cx * 0.45 + Math.sin(t * 0.4) * 0.12;
+    group.rotation.x = cy * 0.25;
+    shell.scale.setScalar(0.55 + 0.45 * intro);
+    shell.rotation.y = t * 0.12;
+    nucleus.rotation.set(t * 0.5, t * 0.7, 0);
+    nucleus.material.emissiveIntensity = 0.9 + Math.sin(t * 2.2) * 0.3;
+    lattice.rotation.set(-t * 0.25, t * 0.2, 0);
+    halo.material.opacity = 0.5 + Math.sin(t * 1.6) * 0.1;
+    ringA.rotation.z = t * 0.35; ringB.rotation.z = -t * 0.28; ringC.rotation.z = t * 0.2;
+    ringA.scale.setScalar(intro); ringB.scale.setScalar(intro); ringC.scale.setScalar(intro);
+
+    gems.forEach(function (g) {
+      var u = g.userData, a = t * u.s + u.o;
+      g.position.set(Math.cos(a) * u.r, Math.sin(a * 0.9) * u.r * 0.35 + u.tilt, Math.sin(a) * u.r * 0.6);
+      g.rotation.set(t * 1.2, t * 0.9, 0); g.scale.setScalar(intro);
+    });
+    var pa = pg.attributes.position.array;
+    for (var i = 0; i < N; i++) { pa[i * 3 + 1] += Math.sin(t * 0.6 + seed[i]) * 0.0016; }
+    pg.attributes.position.needsUpdate = true;
+    dust.rotation.y = t * 0.02;
+
+    wobble(t);
+    camera.position.x = cx * 0.5; camera.position.y = -cy * 0.3; camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+    if (!reduce && visible) { start(); }
+  }
+  function start() { if (!running) { running = true; requestAnimationFrame(frame); } }
+
+  canvas.classList.add('on');
+  start();
 })();
 </script>
 """
@@ -481,11 +609,11 @@ def render_sidebar_header() -> None:
 def render_hero() -> None:
     """Show the 3D banner. st.iframe on current Streamlit, components.html on older versions."""
     if hasattr(st, "iframe"):
-        st.iframe(HERO_HTML, height=250)
+        st.iframe(HERO_HTML, height=340)
     else:
         import streamlit.components.v1 as components  # older Streamlit only
 
-        components.html(HERO_HTML, height=250)
+        components.html(HERO_HTML, height=340)
 
 
 def _load_history_pick() -> None:
