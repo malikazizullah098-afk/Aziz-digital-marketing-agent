@@ -8,13 +8,14 @@ WhatsApp pitch.
 from __future__ import annotations
 
 import csv
+import hmac
 import io
 import os
 import re
 import time
 import urllib.parse
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 import streamlit as st
 
@@ -656,6 +657,139 @@ CUSTOM_CSS = """
 # ---------------------------------------------------------------------------
 # UI helpers
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# AI agent (Claude). Key and password live in Streamlit Secrets, never in GitHub.
+# ---------------------------------------------------------------------------
+AI_MODEL_DEFAULT = "claude-sonnet-5-5"
+AI_MAX_TOKENS = 1400
+AI_DAILY_LIMIT_DEFAULT = 30  # total AI calls per day for the whole app (cost cap)
+
+AI_SYSTEM = (
+    "You are the marketing brain of Aziz Digital Agency, a digital marketing agency in Peshawar, Pakistan. "
+    "You help the agency owner (Aziz) win and serve local clients. "
+    "Always answer in simple Roman Urdu (Urdu written in English letters) with English marketing terms where natural. "
+    "Be practical and specific to Pakistani local businesses: realistic budgets in Rs, WhatsApp-first sales, "
+    "Facebook, Instagram, TikTok and Google Business Profile. Never promise guaranteed results. "
+    "Keep answers well organised with short headings and bullet points."
+)
+
+
+def get_secret(name: str, default=None):
+    try:
+        return st.secrets.get(name, default)
+    except Exception:  # no secrets file configured
+        return default
+
+
+@st.cache_resource
+def _usage() -> dict:
+    return {"day": date.today().isoformat(), "n": 0}
+
+
+def ai_calls_left() -> int:
+    u = _usage()
+    today = date.today().isoformat()
+    if u["day"] != today:
+        u["day"], u["n"] = today, 0
+    return max(0, int(get_secret("AI_DAILY_LIMIT", AI_DAILY_LIMIT_DEFAULT)) - u["n"])
+
+
+def ai_unlocked() -> bool:
+    """True when no password is configured, or the visitor entered the right one."""
+    pw = get_secret("APP_PASSWORD")
+    return not pw or st.session_state.get("ai_ok", False)
+
+
+def call_claude(prompt: str, history: list[tuple[str, str]] | None = None) -> str:
+    """Send one request to Claude. Returns text, or a friendly Roman Urdu error message."""
+    key = get_secret("ANTHROPIC_API_KEY")
+    if not key:
+        return "AI key set nahi hai. Streamlit Secrets mein ANTHROPIC_API_KEY daalein."
+    if ai_calls_left() <= 0:
+        return "Aaj ki AI limit poori ho gayi. Kal dobara try karein."
+    try:
+        import anthropic
+    except ImportError:
+        return "anthropic package install nahi hai. requirements.txt mein 'anthropic' likhein."
+
+    messages = []
+    for q, a in (history or [])[-4:]:
+        messages += [{"role": "user", "content": q}, {"role": "assistant", "content": a}]
+    messages.append({"role": "user", "content": prompt})
+    try:
+        client = anthropic.Anthropic(api_key=key)
+        resp = client.messages.create(
+            model=str(get_secret("AI_MODEL", AI_MODEL_DEFAULT)),
+            max_tokens=AI_MAX_TOKENS,
+            system=AI_SYSTEM,
+            messages=messages,
+        )
+        _usage()["n"] += 1
+        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
+        return text or "AI ne khali jawab diya, dobara try karein."
+    except Exception as exc:  # network, auth, billing, rate limit ...
+        name = type(exc).__name__
+        if "Authentication" in name:
+            return "API key galat hai. Secrets mein key dobara check karein."
+        if "RateLimit" in name:
+            return "AI abhi masroof hai (rate limit). Thori der baad try karein."
+        return f"AI se jawab nahi mila ({name}). Billing/credits aur internet check karein."
+
+
+def strategy_prompt(r: Report) -> str:
+    return (
+        f"Business: {r.business} ({r.city}). Niche: {r.niche.name}. "
+        f"Target audience: {r.niche.audience}. Platforms: {', '.join(r.niche.platforms)}. "
+        f"Monthly package: {r.package.name} (Rs {r.package.price:,}).\n\n"
+        "Is business ke liye yeh sab likho:\n"
+        "1. 30 din ki marketing strategy (4 hafton ka focus)\n"
+        "2. 5 ready-to-post captions (Roman Urdu + hashtags)\n"
+        "3. 2 ad copy (Facebook/Instagram) with headline\n"
+        "4. Pehle mahine ke 3 measurable goals\n"
+        "5. Client ko pehle meeting mein poochne wale 5 sawal"
+    )
+
+
+def render_ai_tab(r: Report) -> None:
+    if not get_secret("ANTHROPIC_API_KEY"):
+        st.info("AI agent abhi band hai. Streamlit Secrets mein ANTHROPIC_API_KEY daalte hi yeh chal jayega.")
+        return
+
+    if not ai_unlocked():
+        pw = st.text_input("AI password:", type="password", key="ai_pw")
+        if pw:
+            if hmac.compare_digest(pw.encode(), str(get_secret("APP_PASSWORD")).encode()):
+                st.session_state["ai_ok"] = True
+                st.rerun()
+            else:
+                st.error("Password galat hai.")
+        return
+
+    st.caption(f"Aaj ki baqi AI requests: {ai_calls_left()}")
+    chat: list[tuple[str, str]] = st.session_state.setdefault("ai_chat", [])
+
+    if st.button("🤖 Is business ki poori strategy likho", type="primary", key="ai_strategy"):
+        with st.spinner("AI soch raha hai..."):
+            answer = call_claude(strategy_prompt(r))
+        chat.append((f"Strategy: {r.business}", answer))
+
+    question = st.text_area("Kuch bhi poochein (captions, ad idea, client ko jawab...):", key="ai_q", height=90,
+                            placeholder="Jaise: Is shop ke liye Eid sale ka caption likho")
+    if st.button("Poochein", key="ai_ask"):
+        if question.strip():
+            ctx = f"Business: {r.business}, niche: {r.niche.name}, city: {r.city}.\n\n{question.strip()}"
+            with st.spinner("AI soch raha hai..."):
+                answer = call_claude(ctx, chat)
+            chat.append((question.strip(), answer))
+        else:
+            st.warning("Pehle sawal likhein.")
+
+    for q, a in reversed(chat[-6:]):
+        with st.container(border=True):
+            st.markdown(f"**{q}**")
+            st.markdown(a)
+
+
 def render_sidebar_header() -> None:
     with st.sidebar:
         if os.path.exists(LOGO_FILE):
@@ -716,7 +850,8 @@ def render_report(r: Report) -> None:
     k3.metric("Price / month", f"Rs {r.package.price:,}")
     k4.metric("Posts planned", len(r.plan))
 
-    tab_research, tab_plan, tab_pitch = st.tabs(["Research", "30-Day Content Plan", "WhatsApp Pitch"])
+    tab_research, tab_plan, tab_pitch, tab_ai = st.tabs(
+        ["Research", "30-Day Content Plan", "WhatsApp Pitch", "🤖 AI Agent"])
 
     with tab_research:
         left, right = st.columns(2)
@@ -741,6 +876,9 @@ def render_report(r: Report) -> None:
         else:
             st.link_button("WhatsApp par kholo (aap ke number par)", build_whatsapp_link(r))
             st.caption("Client ka WhatsApp number upar daalo to yeh button seedha client ki chat kholega.")
+
+    with tab_ai:
+        render_ai_tab(r)
 
 
 
