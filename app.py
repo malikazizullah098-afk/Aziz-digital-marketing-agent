@@ -742,8 +742,6 @@ def render_report(r: Report) -> None:
             st.link_button("WhatsApp par kholo (aap ke number par)", build_whatsapp_link(r))
             st.caption("Client ka WhatsApp number upar daalo to yeh button seedha client ki chat kholega.")
 
-    st.download_button("Download full report (.txt)", report_to_text(r),
-                       file_name=f"{_slug(r.business)}_report.txt", mime="text/plain")
 
 
 def _slug(text: str) -> str:
