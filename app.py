@@ -361,34 +361,40 @@ def create_report(business: str, city: str, budget: int, lang: str, client_raw: 
 
 
 # ---------------------------------------------------------------------------
-# 3D hero banner (Three.js, PBR glass + chrome). Static markup only: no user input is injected.
+# 3D hero banner (Three.js, PBR rocket with mouse interaction). Static markup only: no user input is injected.
 # ---------------------------------------------------------------------------
 HERO_HTML = """
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:transparent;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  #wrap{position:relative;height:100%;border-radius:20px;overflow:hidden;
+  #wrap{position:relative;height:100%;border-radius:20px;overflow:hidden;cursor:none;
         background:
-          radial-gradient(60% 90% at 78% 45%,rgba(124,92,255,.35) 0%,rgba(124,92,255,0) 70%),
-          radial-gradient(40% 60% at 95% 100%,rgba(0,255,200,.18) 0%,rgba(0,255,200,0) 70%),
-          linear-gradient(135deg,#0d0a26 0%,#14103a 50%,#080718 100%);
+          radial-gradient(55% 90% at 76% 50%,rgba(255,90,60,.16) 0%,rgba(255,90,60,0) 70%),
+          radial-gradient(60% 90% at 85% 10%,rgba(110,80,255,.30) 0%,rgba(110,80,255,0) 70%),
+          linear-gradient(135deg,#0a0820 0%,#110d33 55%,#06050f 100%);
         box-shadow:inset 0 0 0 1px rgba(255,255,255,.07),0 20px 60px rgba(40,20,120,.35)}
-  canvas{position:absolute;inset:0;width:100%;height:100%;display:block;opacity:0;transition:opacity 1.2s ease}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;opacity:0;transition:opacity 1s ease}
   canvas.on{opacity:1}
-  .txt{position:absolute;left:34px;top:50%;transform:translateY(-50%);color:#fff;max-width:50%;z-index:2}
+  .txt{position:absolute;left:34px;top:50%;transform:translateY(-50%);color:#fff;max-width:50%;z-index:2;pointer-events:none}
   .eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-size:14px;
         letter-spacing:.4px;color:#9dffd2;background:rgba(120,255,190,.10);border:1px solid rgba(125,255,191,.30);
         backdrop-filter:blur(8px)}
   .dot{width:7px;height:7px;border-radius:50%;background:#5dffb0;box-shadow:0 0 10px #5dffb0;animation:p 1.6s infinite}
   @keyframes p{50%{opacity:.35}}
-  h1{margin:14px 0 10px;font-size:clamp(30px,4.8vw,56px);line-height:1.1;letter-spacing:-.8px;font-weight:800;
-        background:linear-gradient(90deg,#fff 0%,#cfc6ff 45%,#7dffd0 100%);-webkit-background-clip:text;background-clip:text;
-        color:transparent}
+  h1{margin:14px 0 10px;font-size:clamp(30px,4.8vw,56px);line-height:1.08;letter-spacing:-.8px;font-weight:800;
+        background:linear-gradient(90deg,#fff 0%,#d8d0ff 50%,#ffb08a 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
   p{margin:0;color:#d6d2f5;font-size:clamp(15px,1.9vw,20px);line-height:1.45}
   .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
-  .chip{padding:7px 14px;border-radius:10px;font-size:14px;color:#e9e6ff;background:rgba(255,255,255,.06);
+  .chip{padding:7px 14px;border-radius:10px;font-size:14px;color:#efeaff;background:rgba(255,255,255,.06);
         border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px)}
-  @media(max-width:640px){.txt{left:18px;right:18px;max-width:none;top:18px;transform:none}h1{margin:10px 0 6px}.chips{display:none}}
+  .hint{position:absolute;right:16px;bottom:10px;font-size:12px;color:rgba(230,225,255,.55);z-index:2;pointer-events:none}
+  .cur{position:absolute;left:0;top:0;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;z-index:3;pointer-events:none;
+       border:1.5px solid rgba(255,255,255,.75);box-shadow:0 0 18px rgba(255,170,120,.55),inset 0 0 12px rgba(255,170,120,.25);
+       opacity:0;transition:opacity .2s,width .15s,height .15s,margin .15s}
+  .cur.show{opacity:1}
+  .cur.down{width:22px;height:22px;margin:-11px 0 0 -11px;background:rgba(255,170,120,.25)}
+  .cur i{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:#fff}
+  @media(max-width:640px){.txt{left:18px;right:18px;max-width:none;top:18px;transform:none}h1{margin:10px 0 6px}.chips,.hint{display:none}#wrap{cursor:auto}.cur{display:none}}
 </style>
 <div id="wrap">
   <canvas id="c"></canvas>
@@ -398,12 +404,14 @@ HERO_HTML = """
     <p>Research, 30-day content plan aur WhatsApp pitch, ek minute mein.</p>
     <div class="chips"><span class="chip">11 Niches</span><span class="chip">30-Day Plan</span><span class="chip">WhatsApp Pitch</span></div>
   </div>
+  <div class="hint">Mouse hilao, drag karo, click karo 🚀</div>
+  <div class="cur" id="cur"><i></i></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function () {
   if (typeof THREE === 'undefined') { return; }            // CDN blocked: gradient banner only
-  var wrap = document.getElementById('wrap'), canvas = document.getElementById('c'), renderer;
+  var wrap = document.getElementById('wrap'), canvas = document.getElementById('c'), cur = document.getElementById('cur'), renderer;
   try { renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true, powerPreference: 'high-performance' }); }
   catch (e) { return; }                                    // no WebGL: gradient banner only
 
@@ -411,170 +419,225 @@ HERO_HTML = """
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.5 : 2));
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 0.98;
 
   var scene = new THREE.Scene();
-  var camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-  camera.position.set(0, 0, 6.3);
+  var FOV = 36, DIST = 8;
+  var camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 100);
+  camera.position.set(0, 0, DIST);
 
-  // ---- Studio environment: gives real reflections on glass and chrome --------
-  (function buildEnv() {
+  // ---- Studio environment (real reflections on paint, chrome and glass) -----------
+  (function () {
     var env = new THREE.Scene();
-    env.add(new THREE.Mesh(new THREE.SphereGeometry(20, 32, 16),
-      new THREE.MeshBasicMaterial({ color: 0x0b0a22, side: THREE.BackSide })));
-    function panel(color, intensity, w, h, x, y, z) {
+    env.add(new THREE.Mesh(new THREE.SphereGeometry(30, 48, 24), new THREE.MeshBasicMaterial({ color: 0x120e2e, side: THREE.BackSide })));
+    function panel(color, k, w, h, x, y, z) {
       var m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
-        new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), side: THREE.DoubleSide }));
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(k), side: THREE.DoubleSide }));
       m.position.set(x, y, z); m.lookAt(0, 0, 0); env.add(m);
     }
-    panel(0xffffff, 6, 10, 3, 0, 12, 4);        // top softbox
-    panel(0x66ffd0, 5, 3, 10, 12, 0, 2);        // teal strip right
-    panel(0xff5fd2, 4, 3, 10, -12, 2, 2);       // magenta strip left
-    panel(0x7c5cff, 4, 12, 3, 0, -10, 6);       // violet floor bounce
-    panel(0xffffff, 3, 5, 5, 0, 2, 14);         // front fill
+    panel(0xffffff, 7, 16, 5, 0, 16, 6);        // big top softbox
+    panel(0xffb27a, 6, 4, 14, 15, 0, 3);        // warm strip (right)
+    panel(0x7fb6ff, 5, 4, 14, -15, 2, 3);       // cool strip (left)
+    panel(0xffffff, 4, 8, 8, 0, 3, 18);         // front fill
+    panel(0x9c7bff, 3, 16, 4, 0, -14, 6);       // violet floor bounce
+    panel(0xffffff, 3, 2, 10, -8, 0, -14);      // rim strip behind
     var pm = new THREE.PMREMGenerator(renderer);
-    scene.environment = pm.fromScene(env, 0.02).texture;
+    scene.environment = pm.fromScene(env, 0.015).texture;
     pm.dispose();
   })();
 
-  // ---- Lights -----------------------------------------------------------------
-  scene.add(new THREE.AmbientLight(0x6655ff, 0.25));
-  var key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(4, 5, 6); scene.add(key);
-  var teal = new THREE.PointLight(0x4dffc9, 2.2, 30); teal.position.set(5, -1, 3); scene.add(teal);
-  var pink = new THREE.PointLight(0xff4fc8, 2.0, 30); pink.position.set(-5, 2, 3); scene.add(pink);
+  scene.add(new THREE.AmbientLight(0x6a5cff, 0.18));
+  var sun = new THREE.DirectionalLight(0xffffff, 1.2); sun.position.set(4, 6, 6); scene.add(sun);
+  var cursorLight = new THREE.PointLight(0xffb98a, 4, 14, 1.8); cursorLight.position.set(0, 0, 3); scene.add(cursorLight);
 
-  var group = new THREE.Group(); scene.add(group);
-
-  // ---- Glow sprite texture ----------------------------------------------------
-  function glowTex(inner, outer) {
+  function glowTex(a, b) {
     var c = document.createElement('canvas'); c.width = c.height = 128;
     var g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-    gr.addColorStop(0, inner); gr.addColorStop(0.35, outer); gr.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
-    return new THREE.CanvasTexture(c);
+    gr.addColorStop(0, a); gr.addColorStop(0.4, b); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c);
   }
 
-  // ---- Core: liquid glass shell + glowing nucleus -------------------------------
-  var SEG = small ? 48 : 80;
-  var shellGeo = new THREE.SphereGeometry(1.35, SEG, SEG);
-  var base = shellGeo.attributes.position.array.slice();
-  var shell = new THREE.Mesh(shellGeo, new THREE.MeshPhysicalMaterial({
-    color: 0x4a2ee0, metalness: 0.25, roughness: 0.06, transmission: 0.62, thickness: 2.0, ior: 1.5,
-    clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.6, attenuationColor: new THREE.Color(0x3b1fd0),
-    attenuationDistance: 1.4, transparent: true
-  }));
-  group.add(shell);
+  // ---- Rocket (procedural, PBR) -----------------------------------------------------
+  var stage = new THREE.Group(); scene.add(stage);           // position / scale / float
+  var tilt = new THREE.Group(); stage.add(tilt);             // follows mouse
+  var rocket = new THREE.Group(); tilt.add(rocket);          // spins on its axis
 
-  var nucleus = new THREE.Mesh(new THREE.IcosahedronGeometry(0.62, 2),
-    new THREE.MeshStandardMaterial({ color: 0x0b2a2a, emissive: 0x19e6a8, emissiveIntensity: 1.0, metalness: 0.2, roughness: 0.35, flatShading: true }));
-  group.add(nucleus);
-
-  var lattice = new THREE.Mesh(new THREE.IcosahedronGeometry(0.98, 1),
-    new THREE.MeshBasicMaterial({ color: 0x9ffff0, wireframe: true, transparent: true, opacity: 0.28 }));
-  group.add(lattice);
-
-  var halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex('rgba(150,120,255,.9)', 'rgba(110,70,255,.25)'),
-    blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.8 }));
-  halo.scale.set(7.5, 7.5, 1); halo.position.z = -1.2; group.add(halo);
-
-  // ---- Chrome / gold rings ------------------------------------------------------
-  function ring(radius, tube, color, rx, ry) {
-    var m = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 32, 160),
-      new THREE.MeshPhysicalMaterial({ color: color, metalness: 1, roughness: 0.14, clearcoat: 1, envMapIntensity: 1.8 }));
-    m.rotation.set(rx, ry, 0); group.add(m); return m;
+  function lathe(pts, seg) {
+    var curve = new THREE.SplineCurve(pts.map(function (p) { return new THREE.Vector2(p[0], p[1]); }));
+    return new THREE.LatheGeometry(curve.getPoints(90), seg || 96);
   }
-  var ringA = ring(1.95, 0.035, 0xe9e6ff, 1.2, 0.2);
-  var ringB = ring(2.35, 0.025, 0x6dffd0, 0.4, 1.0);
-  var ringC = ring(2.75, 0.018, 0xffc46b, 2.1, 0.6);
+  var bodyMat = new THREE.MeshPhysicalMaterial({ color: 0xf4f4f8, metalness: 0.25, roughness: 0.16, clearcoat: 1, clearcoatRoughness: 0.04, envMapIntensity: 1.2 });
+  var redMat  = new THREE.MeshPhysicalMaterial({ color: 0x8a0414, metalness: 0.05, roughness: 0.34, clearcoat: 0.8, clearcoatRoughness: 0.1, envMapIntensity: 0.55 });
+  var chrome  = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 1, roughness: 0.07, clearcoat: 1, envMapIntensity: 1.8 });
+  var darkMet = new THREE.MeshPhysicalMaterial({ color: 0x22232b, metalness: 1, roughness: 0.32, envMapIntensity: 1.2 });
 
-  // ---- Orbiting gems (stand for platforms) -----------------------------------------
-  var gemColors = [0x4dffc9, 0xff5fd2, 0xffc46b, 0x7cc4ff, 0xb59cff];
-  var gems = gemColors.map(function (col, i) {
-    var m = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0),
-      new THREE.MeshPhysicalMaterial({ color: col, emissive: col, emissiveIntensity: 0.55, metalness: 0.3, roughness: 0.12, clearcoat: 1 }));
-    m.userData = { r: 2.2 + (i % 3) * 0.4, s: 0.5 + i * 0.13, o: i * 1.26, tilt: 0.35 * (i - 2) };
-    group.add(m); return m;
+  rocket.add(new THREE.Mesh(lathe([[0.30, -1.30], [0.40, -1.10], [0.54, -0.75], [0.60, -0.25], [0.60, 0.55], [0.57, 0.92]], 96), bodyMat));
+  rocket.add(new THREE.Mesh(lathe([[0.57, 0.90], [0.50, 1.20], [0.36, 1.52], [0.17, 1.82], [0.0, 2.02]], 96), redMat));
+  var band = new THREE.Mesh(new THREE.TorusGeometry(0.585, 0.028, 24, 120), redMat); band.rotation.x = Math.PI / 2; band.position.y = 0.88; rocket.add(band);
+  var band2 = band.clone(); band2.position.y = -0.62; band2.scale.set(0.95, 0.95, 1); rocket.add(band2);
+
+  var nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.46, 0.34, 64, 1, true), darkMet); nozzle.position.y = -1.42; rocket.add(nozzle);
+  var nozzleRim = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.03, 20, 80), chrome); nozzleRim.rotation.x = Math.PI / 2; nozzleRim.position.y = -1.59; rocket.add(nozzleRim);
+
+  // porthole window
+  var winRing = new THREE.Mesh(new THREE.TorusGeometry(0.235, 0.05, 28, 90), chrome); winRing.position.set(0, 0.28, 0.585); rocket.add(winRing);
+  var glass = new THREE.Mesh(new THREE.SphereGeometry(0.235, 48, 24), new THREE.MeshPhysicalMaterial({ color: 0x07162e, metalness: 0.1, roughness: 0.02, clearcoat: 1, envMapIntensity: 2.2 }));
+  glass.scale.z = 0.35; glass.position.set(0, 0.28, 0.58); rocket.add(glass);
+
+  // fins
+  var fs = new THREE.Shape(); fs.moveTo(0, 0.55); fs.lineTo(0.62, -0.38); fs.lineTo(0.62, -0.98); fs.lineTo(0, -0.62); fs.lineTo(0, 0.55);
+  var finGeo = new THREE.ExtrudeGeometry(fs, { depth: 0.07, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.025, bevelSegments: 4, curveSegments: 10 });
+  finGeo.translate(0, 0, -0.035);
+  for (var k = 0; k < 3; k++) {
+    var pivot = new THREE.Group(); pivot.rotation.y = k * (Math.PI * 2 / 3);
+    var fin = new THREE.Mesh(finGeo, redMat); fin.position.set(0.52, -0.38, 0); pivot.add(fin); rocket.add(pivot);
+  }
+
+  // flame (additive cones) + glow
+  function flameCone(r, h, color, op) {
+    var g = new THREE.ConeGeometry(r, h, 40, 1, true); g.rotateX(Math.PI); g.translate(0, -h / 2, 0);
+    return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  }
+  var flameOuter = flameCone(0.34, 1.9, 0xff5a1f, 0.55), flameMid = flameCone(0.24, 1.5, 0xffa21f, 0.7), flameCore = flameCone(0.13, 1.0, 0xfff2c4, 0.95);
+  [flameOuter, flameMid, flameCore].forEach(function (f) { f.position.y = -1.58; rocket.add(f); });
+  var flameGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex('rgba(255,190,120,1)', 'rgba(255,90,30,.35)'), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.9 }));
+  flameGlow.scale.set(3.6, 3.6, 1); flameGlow.position.y = -1.9; rocket.add(flameGlow);
+  var flameLight = new THREE.PointLight(0xff7a2a, 3, 9, 1.8); flameLight.position.y = -2.0; rocket.add(flameLight);
+
+  // orbit ring + small planets
+  var orbit = new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.012, 12, 200), new THREE.MeshBasicMaterial({ color: 0xbfb2ff, transparent: true, opacity: 0.35 }));
+  orbit.rotation.set(1.25, 0.15, 0.25); stage.add(orbit);
+  var planets = [[0xffc46b, 0.16, 0.0], [0x4dffc9, 0.12, 2.1], [0xff5fd2, 0.14, 4.2]].map(function (d) {
+    var m = new THREE.Mesh(new THREE.SphereGeometry(d[1], 40, 28), new THREE.MeshPhysicalMaterial({ color: d[0], metalness: 0.9, roughness: 0.12, clearcoat: 1, envMapIntensity: 1.8 }));
+    m.userData.o = d[2]; stage.add(m); return m;
   });
 
-  // ---- Particles --------------------------------------------------------------------
-  var N = small ? 160 : 320, pos = new Float32Array(N * 3), seed = new Float32Array(N);
-  for (var i = 0; i < N; i++) {
-    pos[i * 3] = (Math.random() - 0.5) * 18; pos[i * 3 + 1] = (Math.random() - 0.5) * 9; pos[i * 3 + 2] = (Math.random() - 0.5) * 10 - 2;
-    seed[i] = Math.random() * 6.28;
-  }
-  var pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  var dust = new THREE.Points(pg, new THREE.PointsMaterial({ map: glowTex('rgba(255,255,255,1)', 'rgba(180,170,255,.4)'),
-    size: 0.16, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
-  scene.add(dust);
+  // ---- Exhaust particles (world space) ---------------------------------------------------
+  var M = small ? 90 : 170, ep = new Float32Array(M * 3), ec = new Float32Array(M * 3), ev = [], el = new Float32Array(M);
+  for (var i = 0; i < M; i++) { ev.push(new THREE.Vector3()); el[i] = 0; ep[i * 3 + 1] = -999; }
+  var eg = new THREE.BufferGeometry();
+  eg.setAttribute('position', new THREE.BufferAttribute(ep, 3)); eg.setAttribute('color', new THREE.BufferAttribute(ec, 3));
+  var exhaust = new THREE.Points(eg, new THREE.PointsMaterial({ map: glowTex('rgba(255,255,255,1)', 'rgba(255,200,150,.5)'), size: 0.34, vertexColors: true,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  exhaust.frustumCulled = false; scene.add(exhaust);
+  var spawnAcc = 0, nz = new THREE.Vector3(), dn = new THREE.Vector3(), q = new THREE.Quaternion();
 
-  // ---- Interaction ---------------------------------------------------------------------
-  var tx = 0, ty = 0, cx = 0, cy = 0;
-  function aim(x, y) { tx = (x / window.innerWidth - 0.5) * 2; ty = (y / window.innerHeight - 0.5) * 2; }
-  window.addEventListener('mousemove', function (e) { aim(e.clientX, e.clientY); });
-  window.addEventListener('touchmove', function (e) { if (e.touches[0]) aim(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+  // ---- Stars ------------------------------------------------------------------------------------
+  var SN = small ? 160 : 320, sp = new Float32Array(SN * 3);
+  for (var s = 0; s < SN; s++) { sp[s * 3] = (Math.random() - 0.5) * 30; sp[s * 3 + 1] = (Math.random() - 0.5) * 14; sp[s * 3 + 2] = -3 - Math.random() * 12; }
+  var sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+  var stars = new THREE.Points(sg, new THREE.PointsMaterial({ map: glowTex('rgba(255,255,255,1)', 'rgba(190,180,255,.35)'), size: 0.16, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
+  scene.add(stars);
 
+  // ---- Layout (always fully inside the banner) -------------------------------------------------
+  var visH = 1, visW = 1, wide = true, baseScale = 1;
   function resize() {
     var w = wrap.clientWidth, h = wrap.clientHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
-    var wide = w > 640;
-    group.position.x = wide ? 3.35 : 1.0; group.position.y = wide ? 0 : -1.45;
-    group.scale.setScalar(wide ? 0.82 : 0.42);
+    visH = 2 * Math.tan(THREE.MathUtils.degToRad(FOV / 2)) * DIST; visW = visH * camera.aspect; wide = w > 640;
+    baseScale = wide ? Math.min(1.0, visH * 0.74 / 4.1) : Math.min(0.62, visH * 0.40 / 4.1);
+    stage.position.set(wide ? visW * 0.265 : visW * 0.2, wide ? 0 : -visH * 0.2, 0);
   }
   window.addEventListener('resize', resize); resize();
 
-  // ---- Animation ---------------------------------------------------------------------------
-  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var visible = true, running = false, t0 = performance.now();
-  if ('IntersectionObserver' in window) {
-    new IntersectionObserver(function (en) { visible = en[0].isIntersecting; if (visible) start(); }).observe(wrap);
-  }
-  function ease(x) { return 1 - Math.pow(1 - x, 3); }
+  // ---- Interaction: mouse follow (also outside the banner when the page allows), drag, click -------
+  var nx = 0.4, ny = 0, mx = 0.4, my = 0, inside = false, dragging = false, lastX = 0, spin = 0, spinVel = 0, boost = 0;
+  var host = window, fe = null;
+  try { if (window.parent && window.parent !== window && window.parent.document) { host = window.parent; fe = window.frameElement; } } catch (e) { host = window; fe = null; }
 
-  function wobble(t) {
-    var p = shellGeo.attributes.position.array;
-    for (var i = 0; i < p.length; i += 3) {
-      var x = base[i], y = base[i + 1], z = base[i + 2];
-      var d = 1 + 0.07 * Math.sin(x * 2.1 + t * 1.1) * Math.cos(y * 2.3 - t * 0.9) + 0.05 * Math.sin(z * 3.0 + t * 1.4);
-      p[i] = x * d; p[i + 1] = y * d; p[i + 2] = z * d;
-    }
-    shellGeo.attributes.position.needsUpdate = true;
-    shellGeo.computeVertexNormals();
+  function point(e, fromHost) {
+    var r = wrap.getBoundingClientRect(), ox = 0, oy = 0;
+    if (fromHost && fe) { var f = fe.getBoundingClientRect(); ox = f.left; oy = f.top; }
+    var x = e.clientX - ox - r.left, y = e.clientY - oy - r.top;
+    inside = x >= 0 && y >= 0 && x <= r.width && y <= r.height;
+    nx = Math.max(-1.5, Math.min(1.5, (x / r.width) * 2 - 1)); ny = Math.max(-1.5, Math.min(1.5, (y / r.height) * 2 - 1));
+    cur.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+    cur.classList.toggle('show', inside);
   }
+  function onHostMove(e) { try { point(e, host !== window); } catch (err) {} }
+  function onTouch(e) { if (e.touches && e.touches[0]) { point(e.touches[0], false); } }
+  host.addEventListener('mousemove', onHostMove);
+  window.addEventListener('touchmove', onTouch, { passive: true });
+  wrap.addEventListener('mouseleave', function () { if (host === window) { inside = false; cur.classList.remove('show'); } });
+  wrap.addEventListener('pointerdown', function (e) { dragging = true; lastX = e.clientX; cur.classList.add('down'); boost = 1; });
+  window.addEventListener('pointerup', function () { dragging = false; cur.classList.remove('down'); });
+  window.addEventListener('pointermove', function (e) { if (dragging) { spinVel = (e.clientX - lastX) * 0.012; lastX = e.clientX; } });
+  window.addEventListener('pagehide', function () { try { host.removeEventListener('mousemove', onHostMove); } catch (e) {} });
+
+  // ---- Loop --------------------------------------------------------------------------------------
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var visible = true, running = false, t0 = performance.now(), last = t0;
+  if ('IntersectionObserver' in window) { new IntersectionObserver(function (en) { visible = en[0].isIntersecting; if (visible) { last = performance.now(); start(); } }).observe(wrap); }
+  function ease(x) { return 1 - Math.pow(1 - x, 3); }
+  var tmp = new THREE.Vector3();
 
   function frame(now) {
     running = false;
-    var t = reduce ? 10 : (now - t0) / 1000, intro = ease(Math.min(t / 1.6, 1));
-    cx += (tx - cx) * 0.05; cy += (ty - cy) * 0.05;
+    var dt = Math.min((now - last) / 1000, 0.05); last = now;
+    var t = reduce ? 10 : (now - t0) / 1000, intro = ease(Math.min(t / 1.5, 1));
+    mx += (nx - mx) * 0.07; my += (ny - my) * 0.07;
+    boost = Math.max(0, boost - dt * 1.4);
 
-    group.rotation.y = cx * 0.45 + Math.sin(t * 0.4) * 0.12;
-    group.rotation.x = cy * 0.25;
-    shell.scale.setScalar(0.55 + 0.45 * intro);
-    shell.rotation.y = t * 0.12;
-    nucleus.rotation.set(t * 0.5, t * 0.7, 0);
-    nucleus.material.emissiveIntensity = 0.9 + Math.sin(t * 2.2) * 0.3;
-    lattice.rotation.set(-t * 0.25, t * 0.2, 0);
-    halo.material.opacity = 0.5 + Math.sin(t * 1.6) * 0.1;
-    ringA.rotation.z = t * 0.35; ringB.rotation.z = -t * 0.28; ringC.rotation.z = t * 0.2;
-    ringA.scale.setScalar(intro); ringB.scale.setScalar(intro); ringC.scale.setScalar(intro);
+    // spin: drag adds momentum, otherwise a slow turn that shows off the reflections
+    if (!dragging) { spinVel += (0.0035 - spinVel) * 0.03; }
+    spin += spinVel; rocket.rotation.y = spin;
 
-    gems.forEach(function (g) {
-      var u = g.userData, a = t * u.s + u.o;
-      g.position.set(Math.cos(a) * u.r, Math.sin(a * 0.9) * u.r * 0.35 + u.tilt, Math.sin(a) * u.r * 0.6);
-      g.rotation.set(t * 1.2, t * 0.9, 0); g.scale.setScalar(intro);
+    // rocket leans towards the cursor
+    tilt.rotation.z = THREE.MathUtils.lerp(tilt.rotation.z, -0.5 - (mx - 0.4) * 0.35, 0.08);
+    tilt.rotation.x = THREE.MathUtils.lerp(tilt.rotation.x, my * 0.32, 0.08);
+    stage.scale.setScalar(baseScale * (0.35 + 0.65 * intro));
+    stage.position.y = (wide ? 0 : -visH * 0.2) + Math.sin(t * 1.2) * 0.11 - (1 - intro) * 2.2;
+    stage.rotation.y = mx * 0.18;
+
+    // light that follows the cursor over the banner (moves the highlights on paint and chrome)
+    cursorLight.position.set(mx * visW * 0.5, -my * visH * 0.5, 3.2);
+    cursorLight.intensity = inside ? 4.6 : 2.2;
+
+    // flame
+    var fl = 1 + Math.sin(t * 38) * 0.06 + Math.sin(t * 23 + 1.3) * 0.05 + boost * 0.7;
+    flameOuter.scale.set(1 + Math.sin(t * 31) * 0.05, fl * 1.05, 1 + Math.cos(t * 29) * 0.05);
+    flameMid.scale.set(1, fl * 0.97, 1); flameCore.scale.set(1, fl * 0.9, 1);
+    flameGlow.material.opacity = 0.75 + Math.sin(t * 20) * 0.1 + boost * 0.2;
+    flameLight.intensity = 2.6 + Math.sin(t * 27) * 0.5 + boost * 3;
+
+    // planets orbit
+    planets.forEach(function (p, i) {
+      var a = t * (0.5 + i * 0.12) + p.userData.o;
+      p.position.set(Math.cos(a) * 2.2, Math.sin(a) * 2.2 * Math.sin(1.25) * 0.5, Math.sin(a) * 2.2 * 0.5);
+      p.scale.setScalar(intro);
     });
-    var pa = pg.attributes.position.array;
-    for (var i = 0; i < N; i++) { pa[i * 3 + 1] += Math.sin(t * 0.6 + seed[i]) * 0.0016; }
-    pg.attributes.position.needsUpdate = true;
-    dust.rotation.y = t * 0.02;
+    orbit.rotation.z = 0.25 + t * 0.05; orbit.scale.setScalar(intro);
 
-    wobble(t);
-    camera.position.x = cx * 0.5; camera.position.y = -cy * 0.3; camera.lookAt(0, 0, 0);
+    // exhaust: emit from the nozzle, travelling opposite to the rocket's nose
+    stage.updateMatrixWorld(true);
+    nz.set(0, -1.62, 0); rocket.localToWorld(nz);
+    rocket.getWorldQuaternion(q); dn.set(0, -1, 0).applyQuaternion(q);
+    var sc = stage.scale.x;
+    spawnAcc += dt * (M / 0.9) * (1 + boost * 1.5);
+    var made = 0;
+    for (var i = 0; i < M; i++) {
+      if (el[i] <= 0 && spawnAcc >= 1 && made < 12) {
+        spawnAcc -= 1; made++; el[i] = 0.7 + Math.random() * 0.35;
+        ep[i * 3] = nz.x + (Math.random() - 0.5) * 0.18 * sc; ep[i * 3 + 1] = nz.y + (Math.random() - 0.5) * 0.18 * sc; ep[i * 3 + 2] = nz.z + (Math.random() - 0.5) * 0.18 * sc;
+        ev[i].copy(dn).multiplyScalar((2.4 + Math.random() * 1.4 + boost * 2) * sc);
+        ev[i].x += (Math.random() - 0.5) * 0.7 * sc; ev[i].y += (Math.random() - 0.5) * 0.7 * sc;
+      }
+      if (el[i] > 0) {
+        el[i] -= dt; var life = Math.max(el[i], 0) / 1.0;
+        ep[i * 3] += ev[i].x * dt; ep[i * 3 + 1] += ev[i].y * dt; ep[i * 3 + 2] += ev[i].z * dt;
+        var f = life * life;
+        ec[i * 3] = 1.0 * f; ec[i * 3 + 1] = (0.35 + 0.4 * life) * f; ec[i * 3 + 2] = 0.12 * f;
+      } else { ec[i * 3] = ec[i * 3 + 1] = ec[i * 3 + 2] = 0; }
+    }
+    eg.attributes.position.needsUpdate = true; eg.attributes.color.needsUpdate = true;
+
+    stars.position.x = -mx * 0.4; stars.position.y = my * 0.25; stars.rotation.z = t * 0.004;
+    camera.lookAt(0, 0, 0);
     renderer.render(scene, camera);
     if (!reduce && visible) { start(); }
   }
   function start() { if (!running) { running = true; requestAnimationFrame(frame); } }
-
   canvas.classList.add('on');
   start();
 })();
