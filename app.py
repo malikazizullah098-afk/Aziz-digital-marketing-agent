@@ -27,7 +27,7 @@ import streamlit as st
 AGENCY = "Aziz Digital Agency"
 MY_WA = "923715221906"  # agency WhatsApp number (international format, no +)
 DEFAULT_CITY = "Peshawar"
-LOGO_FILE = "WhatsApp Image 2026-10-28 at 8.45.36 PM.jpeg"
+LOGO_FILE  = "aziz_logo_transparent.png"
 MAX_HISTORY = 10
 
 st.set_page_config(page_title="Aziz Agency", page_icon="🚀", layout="wide")
