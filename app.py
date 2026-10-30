@@ -18,6 +18,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from datetime import date, datetime
+from html import escape
 
 import streamlit as st
 
@@ -27,7 +28,6 @@ import streamlit as st
 AGENCY = "Aziz Digital Agency"
 MY_WA = "923715221906"  # agency WhatsApp number (international format, no +)
 DEFAULT_CITY = "Peshawar"
-LOGO_FILE  = "aziz_logo_transparent.png"
 MAX_HISTORY = 10
 
 st.set_page_config(page_title="Aziz Agency", page_icon="🚀", layout="wide")
@@ -364,302 +364,6 @@ def create_report(business: str, city: str, budget: int, lang: str, client_raw: 
 
 
 # ---------------------------------------------------------------------------
-# 3D hero banner (Three.js, PBR rocket with mouse interaction). Static markup only: no user input is injected.
-# ---------------------------------------------------------------------------
-HERO_HTML = """
-<style>
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%;background:transparent;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  #wrap{position:relative;height:100%;border-radius:20px;overflow:hidden;cursor:none;
-        background:
-          radial-gradient(55% 90% at 76% 50%,rgba(255,90,60,.16) 0%,rgba(255,90,60,0) 70%),
-          radial-gradient(60% 90% at 85% 10%,rgba(110,80,255,.30) 0%,rgba(110,80,255,0) 70%),
-          linear-gradient(135deg,#0a0820 0%,#110d33 55%,#06050f 100%);
-        box-shadow:inset 0 0 0 1px rgba(255,255,255,.07),0 20px 60px rgba(40,20,120,.35)}
-  canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;opacity:0;transition:opacity 1s ease}
-  canvas.on{opacity:1}
-  .txt{position:absolute;left:34px;top:50%;transform:translateY(-50%);color:#fff;max-width:50%;z-index:2;pointer-events:none}
-  .eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-size:14px;
-        letter-spacing:.4px;color:#9dffd2;background:rgba(120,255,190,.10);border:1px solid rgba(125,255,191,.30);
-        backdrop-filter:blur(8px)}
-  .dot{width:7px;height:7px;border-radius:50%;background:#5dffb0;box-shadow:0 0 10px #5dffb0;animation:p 1.6s infinite}
-  @keyframes p{50%{opacity:.35}}
-  h1{margin:14px 0 10px;font-size:clamp(30px,4.8vw,56px);line-height:1.08;letter-spacing:-.8px;font-weight:800;
-        background:linear-gradient(90deg,#fff 0%,#d8d0ff 50%,#ffb08a 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
-  p{margin:0;color:#d6d2f5;font-size:clamp(15px,1.9vw,20px);line-height:1.45}
-  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
-  .chip{padding:7px 14px;border-radius:10px;font-size:14px;color:#efeaff;background:rgba(255,255,255,.06);
-        border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px)}
-  .hint{position:absolute;right:16px;bottom:10px;font-size:12px;color:rgba(230,225,255,.55);z-index:2;pointer-events:none}
-  .cur{position:absolute;left:0;top:0;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;z-index:3;pointer-events:none;
-       border:1.5px solid rgba(255,255,255,.75);box-shadow:0 0 18px rgba(255,170,120,.55),inset 0 0 12px rgba(255,170,120,.25);
-       opacity:0;transition:opacity .2s,width .15s,height .15s,margin .15s}
-  .cur.show{opacity:1}
-  .cur.down{width:22px;height:22px;margin:-11px 0 0 -11px;background:rgba(255,170,120,.25)}
-  .cur i{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:#fff}
-  @media(max-width:640px){.txt{left:18px;right:18px;max-width:none;top:18px;transform:none}h1{margin:10px 0 6px}.chips,.hint{display:none}#wrap{cursor:auto}.cur{display:none}}
-</style>
-<div id="wrap">
-  <canvas id="c"></canvas>
-  <div class="txt">
-    <span class="eyebrow"><span class="dot"></span>Cloud LIVE</span>
-    <h1>Aziz AI Marketing<br>Cloud Agent</h1>
-    <p>Research, 30-day content plan aur WhatsApp pitch, ek minute mein.</p>
-    <div class="chips"><span class="chip">11 Niches</span><span class="chip">30-Day Plan</span><span class="chip">WhatsApp Pitch</span></div>
-  </div>
-  <div class="hint">Mouse hilao, drag karo, click karo 🚀</div>
-  <div class="cur" id="cur"><i></i></div>
-</div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-(function () {
-  if (typeof THREE === 'undefined') { return; }            // CDN blocked: gradient banner only
-  var wrap = document.getElementById('wrap'), canvas = document.getElementById('c'), cur = document.getElementById('cur'), renderer;
-  try { renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true, powerPreference: 'high-performance' }); }
-  catch (e) { return; }                                    // no WebGL: gradient banner only
-
-  var small = Math.min(window.screen.width || 1000, window.innerWidth) < 700;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.5 : 2));
-  renderer.outputEncoding = THREE.sRGBEncoding;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.98;
-
-  var scene = new THREE.Scene();
-  var FOV = 36, DIST = 8;
-  var camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 100);
-  camera.position.set(0, 0, DIST);
-
-  // ---- Studio environment (real reflections on paint, chrome and glass) -----------
-  (function () {
-    var env = new THREE.Scene();
-    env.add(new THREE.Mesh(new THREE.SphereGeometry(30, 48, 24), new THREE.MeshBasicMaterial({ color: 0x120e2e, side: THREE.BackSide })));
-    function panel(color, k, w, h, x, y, z) {
-      var m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
-        new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(k), side: THREE.DoubleSide }));
-      m.position.set(x, y, z); m.lookAt(0, 0, 0); env.add(m);
-    }
-    panel(0xffffff, 7, 16, 5, 0, 16, 6);        // big top softbox
-    panel(0xffb27a, 6, 4, 14, 15, 0, 3);        // warm strip (right)
-    panel(0x7fb6ff, 5, 4, 14, -15, 2, 3);       // cool strip (left)
-    panel(0xffffff, 4, 8, 8, 0, 3, 18);         // front fill
-    panel(0x9c7bff, 3, 16, 4, 0, -14, 6);       // violet floor bounce
-    panel(0xffffff, 3, 2, 10, -8, 0, -14);      // rim strip behind
-    var pm = new THREE.PMREMGenerator(renderer);
-    scene.environment = pm.fromScene(env, 0.015).texture;
-    pm.dispose();
-  })();
-
-  scene.add(new THREE.AmbientLight(0x6a5cff, 0.18));
-  var sun = new THREE.DirectionalLight(0xffffff, 1.2); sun.position.set(4, 6, 6); scene.add(sun);
-  var cursorLight = new THREE.PointLight(0xffb98a, 4, 14, 1.8); cursorLight.position.set(0, 0, 3); scene.add(cursorLight);
-
-  function glowTex(a, b) {
-    var c = document.createElement('canvas'); c.width = c.height = 128;
-    var g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-    gr.addColorStop(0, a); gr.addColorStop(0.4, b); gr.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c);
-  }
-
-  // ---- Rocket (procedural, PBR) -----------------------------------------------------
-  var stage = new THREE.Group(); scene.add(stage);           // position / scale / float
-  var tilt = new THREE.Group(); stage.add(tilt);             // follows mouse
-  var rocket = new THREE.Group(); tilt.add(rocket);          // spins on its axis
-
-  function lathe(pts, seg) {
-    var curve = new THREE.SplineCurve(pts.map(function (p) { return new THREE.Vector2(p[0], p[1]); }));
-    return new THREE.LatheGeometry(curve.getPoints(90), seg || 96);
-  }
-  var bodyMat = new THREE.MeshPhysicalMaterial({ color: 0xf4f4f8, metalness: 0.25, roughness: 0.16, clearcoat: 1, clearcoatRoughness: 0.04, envMapIntensity: 1.2 });
-  var redMat  = new THREE.MeshPhysicalMaterial({ color: 0x8a0414, metalness: 0.05, roughness: 0.34, clearcoat: 0.8, clearcoatRoughness: 0.1, envMapIntensity: 0.55 });
-  var chrome  = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 1, roughness: 0.07, clearcoat: 1, envMapIntensity: 1.8 });
-  var darkMet = new THREE.MeshPhysicalMaterial({ color: 0x22232b, metalness: 1, roughness: 0.32, envMapIntensity: 1.2 });
-
-  rocket.add(new THREE.Mesh(lathe([[0.30, -1.30], [0.40, -1.10], [0.54, -0.75], [0.60, -0.25], [0.60, 0.55], [0.57, 0.92]], 96), bodyMat));
-  rocket.add(new THREE.Mesh(lathe([[0.57, 0.90], [0.50, 1.20], [0.36, 1.52], [0.17, 1.82], [0.0, 2.02]], 96), redMat));
-  var band = new THREE.Mesh(new THREE.TorusGeometry(0.585, 0.028, 24, 120), redMat); band.rotation.x = Math.PI / 2; band.position.y = 0.88; rocket.add(band);
-  var band2 = band.clone(); band2.position.y = -0.62; band2.scale.set(0.95, 0.95, 1); rocket.add(band2);
-
-  var nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.46, 0.34, 64, 1, true), darkMet); nozzle.position.y = -1.42; rocket.add(nozzle);
-  var nozzleRim = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.03, 20, 80), chrome); nozzleRim.rotation.x = Math.PI / 2; nozzleRim.position.y = -1.59; rocket.add(nozzleRim);
-
-  // porthole window
-  var winRing = new THREE.Mesh(new THREE.TorusGeometry(0.235, 0.05, 28, 90), chrome); winRing.position.set(0, 0.28, 0.585); rocket.add(winRing);
-  var glass = new THREE.Mesh(new THREE.SphereGeometry(0.235, 48, 24), new THREE.MeshPhysicalMaterial({ color: 0x07162e, metalness: 0.1, roughness: 0.02, clearcoat: 1, envMapIntensity: 2.2 }));
-  glass.scale.z = 0.35; glass.position.set(0, 0.28, 0.58); rocket.add(glass);
-
-  // fins
-  var fs = new THREE.Shape(); fs.moveTo(0, 0.55); fs.lineTo(0.62, -0.38); fs.lineTo(0.62, -0.98); fs.lineTo(0, -0.62); fs.lineTo(0, 0.55);
-  var finGeo = new THREE.ExtrudeGeometry(fs, { depth: 0.07, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.025, bevelSegments: 4, curveSegments: 10 });
-  finGeo.translate(0, 0, -0.035);
-  for (var k = 0; k < 3; k++) {
-    var pivot = new THREE.Group(); pivot.rotation.y = k * (Math.PI * 2 / 3);
-    var fin = new THREE.Mesh(finGeo, redMat); fin.position.set(0.52, -0.38, 0); pivot.add(fin); rocket.add(pivot);
-  }
-
-  // flame (additive cones) + glow
-  function flameCone(r, h, color, op) {
-    var g = new THREE.ConeGeometry(r, h, 40, 1, true); g.rotateX(Math.PI); g.translate(0, -h / 2, 0);
-    return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-  }
-  var flameOuter = flameCone(0.34, 1.9, 0xff5a1f, 0.55), flameMid = flameCone(0.24, 1.5, 0xffa21f, 0.7), flameCore = flameCone(0.13, 1.0, 0xfff2c4, 0.95);
-  [flameOuter, flameMid, flameCore].forEach(function (f) { f.position.y = -1.58; rocket.add(f); });
-  var flameGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex('rgba(255,190,120,1)', 'rgba(255,90,30,.35)'), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.9 }));
-  flameGlow.scale.set(3.6, 3.6, 1); flameGlow.position.y = -1.9; rocket.add(flameGlow);
-  var flameLight = new THREE.PointLight(0xff7a2a, 3, 9, 1.8); flameLight.position.y = -2.0; rocket.add(flameLight);
-
-  // orbit ring + small planets
-  var orbit = new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.012, 12, 200), new THREE.MeshBasicMaterial({ color: 0xbfb2ff, transparent: true, opacity: 0.35 }));
-  orbit.rotation.set(1.25, 0.15, 0.25); stage.add(orbit);
-  var planets = [[0xffc46b, 0.16, 0.0], [0x4dffc9, 0.12, 2.1], [0xff5fd2, 0.14, 4.2]].map(function (d) {
-    var m = new THREE.Mesh(new THREE.SphereGeometry(d[1], 40, 28), new THREE.MeshPhysicalMaterial({ color: d[0], metalness: 0.9, roughness: 0.12, clearcoat: 1, envMapIntensity: 1.8 }));
-    m.userData.o = d[2]; stage.add(m); return m;
-  });
-
-  // ---- Exhaust particles (world space) ---------------------------------------------------
-  var M = small ? 90 : 170, ep = new Float32Array(M * 3), ec = new Float32Array(M * 3), ev = [], el = new Float32Array(M);
-  for (var i = 0; i < M; i++) { ev.push(new THREE.Vector3()); el[i] = 0; ep[i * 3 + 1] = -999; }
-  var eg = new THREE.BufferGeometry();
-  eg.setAttribute('position', new THREE.BufferAttribute(ep, 3)); eg.setAttribute('color', new THREE.BufferAttribute(ec, 3));
-  var exhaust = new THREE.Points(eg, new THREE.PointsMaterial({ map: glowTex('rgba(255,255,255,1)', 'rgba(255,200,150,.5)'), size: 0.34, vertexColors: true,
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-  exhaust.frustumCulled = false; scene.add(exhaust);
-  var spawnAcc = 0, nz = new THREE.Vector3(), dn = new THREE.Vector3(), q = new THREE.Quaternion();
-
-  // ---- Stars ------------------------------------------------------------------------------------
-  var SN = small ? 160 : 320, sp = new Float32Array(SN * 3);
-  for (var s = 0; s < SN; s++) { sp[s * 3] = (Math.random() - 0.5) * 30; sp[s * 3 + 1] = (Math.random() - 0.5) * 14; sp[s * 3 + 2] = -3 - Math.random() * 12; }
-  var sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
-  var stars = new THREE.Points(sg, new THREE.PointsMaterial({ map: glowTex('rgba(255,255,255,1)', 'rgba(190,180,255,.35)'), size: 0.16, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
-  scene.add(stars);
-
-  // ---- Layout (always fully inside the banner) -------------------------------------------------
-  var visH = 1, visW = 1, wide = true, baseScale = 1;
-  function resize() {
-    var w = wrap.clientWidth, h = wrap.clientHeight;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h; camera.updateProjectionMatrix();
-    visH = 2 * Math.tan(THREE.MathUtils.degToRad(FOV / 2)) * DIST; visW = visH * camera.aspect; wide = w > 640;
-    baseScale = wide ? Math.min(1.0, visH * 0.74 / 4.1) : Math.min(0.62, visH * 0.40 / 4.1);
-    stage.position.set(wide ? visW * 0.265 : visW * 0.2, wide ? 0 : -visH * 0.2, 0);
-  }
-  window.addEventListener('resize', resize); resize();
-
-  // ---- Interaction: mouse follow (also outside the banner when the page allows), drag, click -------
-  var nx = 0.4, ny = 0, mx = 0.4, my = 0, inside = false, dragging = false, lastX = 0, spin = 0, spinVel = 0, boost = 0;
-  var host = window, fe = null;
-  try { if (window.parent && window.parent !== window && window.parent.document) { host = window.parent; fe = window.frameElement; } } catch (e) { host = window; fe = null; }
-
-  function point(e, fromHost) {
-    var r = wrap.getBoundingClientRect(), ox = 0, oy = 0;
-    if (fromHost && fe) { var f = fe.getBoundingClientRect(); ox = f.left; oy = f.top; }
-    var x = e.clientX - ox - r.left, y = e.clientY - oy - r.top;
-    inside = x >= 0 && y >= 0 && x <= r.width && y <= r.height;
-    nx = Math.max(-1.5, Math.min(1.5, (x / r.width) * 2 - 1)); ny = Math.max(-1.5, Math.min(1.5, (y / r.height) * 2 - 1));
-    cur.style.transform = 'translate(' + x + 'px,' + y + 'px)';
-    cur.classList.toggle('show', inside);
-  }
-  function onHostMove(e) { try { point(e, host !== window); } catch (err) {} }
-  function onTouch(e) { if (e.touches && e.touches[0]) { point(e.touches[0], false); } }
-  host.addEventListener('mousemove', onHostMove);
-  window.addEventListener('touchmove', onTouch, { passive: true });
-  wrap.addEventListener('mouseleave', function () { if (host === window) { inside = false; cur.classList.remove('show'); } });
-  wrap.addEventListener('pointerdown', function (e) { dragging = true; lastX = e.clientX; cur.classList.add('down'); boost = 1; });
-  window.addEventListener('pointerup', function () { dragging = false; cur.classList.remove('down'); });
-  window.addEventListener('pointermove', function (e) { if (dragging) { spinVel = (e.clientX - lastX) * 0.012; lastX = e.clientX; } });
-  window.addEventListener('pagehide', function () { try { host.removeEventListener('mousemove', onHostMove); } catch (e) {} });
-
-  // ---- Loop --------------------------------------------------------------------------------------
-  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var visible = true, running = false, t0 = performance.now(), last = t0;
-  if ('IntersectionObserver' in window) { new IntersectionObserver(function (en) { visible = en[0].isIntersecting; if (visible) { last = performance.now(); start(); } }).observe(wrap); }
-  function ease(x) { return 1 - Math.pow(1 - x, 3); }
-  var tmp = new THREE.Vector3();
-
-  function frame(now) {
-    running = false;
-    var dt = Math.min((now - last) / 1000, 0.05); last = now;
-    var t = reduce ? 10 : (now - t0) / 1000, intro = ease(Math.min(t / 1.5, 1));
-    mx += (nx - mx) * 0.07; my += (ny - my) * 0.07;
-    boost = Math.max(0, boost - dt * 1.4);
-
-    // spin: drag adds momentum, otherwise a slow turn that shows off the reflections
-    if (!dragging) { spinVel += (0.0035 - spinVel) * 0.03; }
-    spin += spinVel; rocket.rotation.y = spin;
-
-    // rocket leans towards the cursor
-    tilt.rotation.z = THREE.MathUtils.lerp(tilt.rotation.z, -0.5 - (mx - 0.4) * 0.35, 0.08);
-    tilt.rotation.x = THREE.MathUtils.lerp(tilt.rotation.x, my * 0.32, 0.08);
-    stage.scale.setScalar(baseScale * (0.35 + 0.65 * intro));
-    stage.position.y = (wide ? 0 : -visH * 0.2) + Math.sin(t * 1.2) * 0.11 - (1 - intro) * 2.2;
-    stage.rotation.y = mx * 0.18;
-
-    // light that follows the cursor over the banner (moves the highlights on paint and chrome)
-    cursorLight.position.set(mx * visW * 0.5, -my * visH * 0.5, 3.2);
-    cursorLight.intensity = inside ? 4.6 : 2.2;
-
-    // flame
-    var fl = 1 + Math.sin(t * 38) * 0.06 + Math.sin(t * 23 + 1.3) * 0.05 + boost * 0.7;
-    flameOuter.scale.set(1 + Math.sin(t * 31) * 0.05, fl * 1.05, 1 + Math.cos(t * 29) * 0.05);
-    flameMid.scale.set(1, fl * 0.97, 1); flameCore.scale.set(1, fl * 0.9, 1);
-    flameGlow.material.opacity = 0.75 + Math.sin(t * 20) * 0.1 + boost * 0.2;
-    flameLight.intensity = 2.6 + Math.sin(t * 27) * 0.5 + boost * 3;
-
-    // planets orbit
-    planets.forEach(function (p, i) {
-      var a = t * (0.5 + i * 0.12) + p.userData.o;
-      p.position.set(Math.cos(a) * 2.2, Math.sin(a) * 2.2 * Math.sin(1.25) * 0.5, Math.sin(a) * 2.2 * 0.5);
-      p.scale.setScalar(intro);
-    });
-    orbit.rotation.z = 0.25 + t * 0.05; orbit.scale.setScalar(intro);
-
-    // exhaust: emit from the nozzle, travelling opposite to the rocket's nose
-    stage.updateMatrixWorld(true);
-    nz.set(0, -1.62, 0); rocket.localToWorld(nz);
-    rocket.getWorldQuaternion(q); dn.set(0, -1, 0).applyQuaternion(q);
-    var sc = stage.scale.x;
-    spawnAcc += dt * (M / 0.9) * (1 + boost * 1.5);
-    var made = 0;
-    for (var i = 0; i < M; i++) {
-      if (el[i] <= 0 && spawnAcc >= 1 && made < 12) {
-        spawnAcc -= 1; made++; el[i] = 0.7 + Math.random() * 0.35;
-        ep[i * 3] = nz.x + (Math.random() - 0.5) * 0.18 * sc; ep[i * 3 + 1] = nz.y + (Math.random() - 0.5) * 0.18 * sc; ep[i * 3 + 2] = nz.z + (Math.random() - 0.5) * 0.18 * sc;
-        ev[i].copy(dn).multiplyScalar((2.4 + Math.random() * 1.4 + boost * 2) * sc);
-        ev[i].x += (Math.random() - 0.5) * 0.7 * sc; ev[i].y += (Math.random() - 0.5) * 0.7 * sc;
-      }
-      if (el[i] > 0) {
-        el[i] -= dt; var life = Math.max(el[i], 0) / 1.0;
-        ep[i * 3] += ev[i].x * dt; ep[i * 3 + 1] += ev[i].y * dt; ep[i * 3 + 2] += ev[i].z * dt;
-        var f = life * life;
-        ec[i * 3] = 1.0 * f; ec[i * 3 + 1] = (0.35 + 0.4 * life) * f; ec[i * 3 + 2] = 0.12 * f;
-      } else { ec[i * 3] = ec[i * 3 + 1] = ec[i * 3 + 2] = 0; }
-    }
-    eg.attributes.position.needsUpdate = true; eg.attributes.color.needsUpdate = true;
-
-    stars.position.x = -mx * 0.4; stars.position.y = my * 0.25; stars.rotation.z = t * 0.004;
-    camera.lookAt(0, 0, 0);
-    renderer.render(scene, camera);
-    if (!reduce && visible) { start(); }
-  }
-  function start() { if (!running) { running = true; requestAnimationFrame(frame); } }
-  canvas.classList.add('on');
-  start();
-})();
-</script>
-"""
-
-CUSTOM_CSS = """
-<style>
-  div[data-testid="stMetric"]{background:rgba(124,92,255,.08);border:1px solid rgba(124,92,255,.25);
-      padding:12px 16px;border-radius:12px}
-  .stButton>button[kind="primary"]{border-radius:10px;font-weight:600}
-</style>
-"""
-
-
-# ---------------------------------------------------------------------------
-# UI helpers
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 # AI agent. Gemini (free key) or Claude (paid key). Keys and password live in Streamlit Secrets, never in GitHub.
 # ---------------------------------------------------------------------------
 AI_MODEL_DEFAULT = "claude-sonnet-5-5"      # Claude model
@@ -854,27 +558,425 @@ def render_ai_tab(r: Report) -> None:
             st.markdown(a)
 
 
+# ---------------------------------------------------------------------------
+# Visual design: 3D hero (Three.js), sidebar logo, theme CSS.
+# These strings are static: no user input is ever injected into them.
+# ---------------------------------------------------------------------------
+HERO_HTML = """
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:transparent;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  #wrap{position:relative;height:100%;border-radius:24px;overflow:hidden;cursor:none;
+        background:
+          radial-gradient(48% 85% at 76% 52%,rgba(255,106,60,.20) 0%,rgba(255,106,60,0) 70%),
+          radial-gradient(60% 90% at 90% 0%,rgba(124,92,255,.34) 0%,rgba(124,92,255,0) 70%),
+          linear-gradient(135deg,#0b0924 0%,#120e38 55%,#06050f 100%);
+        box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 24px 70px rgba(40,20,120,.40)}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;opacity:0;transition:opacity 1s ease}
+  canvas.on{opacity:1}
+  .txt{position:absolute;left:38px;top:50%;transform:translateY(-50%);color:#fff;max-width:48%;z-index:2;pointer-events:none}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-size:13px;
+        letter-spacing:.5px;color:#9dffd2;background:rgba(120,255,190,.10);border:1px solid rgba(125,255,191,.30);backdrop-filter:blur(8px)}
+  .dot{width:7px;height:7px;border-radius:50%;background:#5dffb0;box-shadow:0 0 10px #5dffb0;animation:p 1.6s infinite}
+  @keyframes p{50%{opacity:.35}}
+  h1{margin:16px 0 10px;font-size:clamp(30px,4.6vw,58px);line-height:1.05;letter-spacing:-1px;font-weight:800;
+        background:linear-gradient(90deg,#fff 0%,#d8d0ff 50%,#ffb08a 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+  p{margin:0;color:#d6d2f5;font-size:clamp(14px,1.7vw,19px);line-height:1.5}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  .chip{padding:7px 15px;border-radius:999px;font-size:13px;color:#efeaff;background:rgba(255,255,255,.07);
+        border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(10px)}
+  .hint{position:absolute;right:18px;bottom:12px;font-size:12px;color:rgba(230,225,255,.5);z-index:2;pointer-events:none}
+  .cur{position:absolute;left:0;top:0;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;z-index:3;pointer-events:none;
+       border:1.5px solid rgba(255,255,255,.75);box-shadow:0 0 18px rgba(255,170,120,.55),inset 0 0 12px rgba(255,170,120,.25);
+       opacity:0;transition:opacity .2s,width .15s,height .15s,margin .15s}
+  .cur.show{opacity:1}
+  .cur.down{width:22px;height:22px;margin:-11px 0 0 -11px;background:rgba(255,170,120,.25)}
+  .cur i{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:#fff}
+  @media(max-width:640px){.txt{left:18px;right:18px;max-width:none;top:20px;transform:none}h1{margin:12px 0 6px}.chips,.hint{display:none}#wrap{cursor:auto}.cur{display:none}}
+</style>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div class="txt">
+    <span class="eyebrow"><span class="dot"></span>Cloud LIVE</span>
+    <h1>Aziz Digital<br>Marketer Agent</h1>
+    <p>Business ka naam likho. Research, 30-din ka plan aur WhatsApp pitch, ek minute mein.</p>
+    <div class="chips"><span class="chip">11 Niches</span><span class="chip">30-Day Plan</span><span class="chip">AI Agent</span></div>
+  </div>
+  <div class="hint">Mouse hilao, drag karo, click karo</div>
+  <div class="cur" id="cur"><i></i></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  if (typeof THREE === 'undefined') { return; }            // CDN blocked: gradient banner only
+  var wrap = document.getElementById('wrap'), canvas = document.getElementById('c'), cur = document.getElementById('cur'), renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true, powerPreference: 'high-performance' }); }
+  catch (e) { return; }                                    // no WebGL: gradient banner only
+
+  var small = Math.min(window.screen.width || 1000, window.innerWidth) < 700;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.5 : 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+
+  var scene = new THREE.Scene();
+  var FOV = 36, DIST = 9;
+  var camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 100);
+  camera.position.set(0, 0, DIST);
+
+  // ---- Studio environment: softboxes that give the metal real reflections ---------------
+  (function () {
+    var env = new THREE.Scene();
+    env.add(new THREE.Mesh(new THREE.SphereGeometry(30, 48, 24), new THREE.MeshBasicMaterial({ color: 0x100c2c, side: THREE.BackSide })));
+    function panel(color, k, w, h, x, y, z) {
+      var m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(k), side: THREE.DoubleSide }));
+      m.position.set(x, y, z); m.lookAt(0, 0, 0); env.add(m);
+    }
+    panel(0xffffff, 7, 18, 5, 0, 16, 6);
+    panel(0xffb27a, 6, 4, 14, 15, 0, 3);
+    panel(0x7fb6ff, 5, 4, 14, -15, 2, 3);
+    panel(0xffffff, 3.4, 30, 20, 0, 2, 22);
+    panel(0xdfe6ff, 2.2, 6, 30, 0, 0, -20);
+    panel(0x05040f, 1.0, 26, 3, 0, -3, 14);   // dark band for chrome contrast
+    panel(0x9c7bff, 3, 16, 4, 0, -14, 6);
+    panel(0xffffff, 3, 2, 10, -8, 0, -14);
+    var pm = new THREE.PMREMGenerator(renderer);
+    scene.environment = pm.fromScene(env, 0.015).texture;
+    pm.dispose();
+  })();
+
+  scene.add(new THREE.AmbientLight(0x6a5cff, 0.2));
+  var sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.position.set(4, 6, 6); scene.add(sun);
+  var cursorLight = new THREE.PointLight(0xffb98a, 4, 16, 1.8); cursorLight.position.set(0, 0, 3.4); scene.add(cursorLight);
+
+  function glowTex(a, b) {
+    var c = document.createElement('canvas'); c.width = c.height = 128;
+    var g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0, a); gr.addColorStop(0.4, b); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c);
+  }
+
+  var stage = new THREE.Group(); scene.add(stage);      // position / scale / float
+  var tilt = new THREE.Group(); stage.add(tilt);        // follows the mouse
+  var piece = new THREE.Group(); tilt.add(piece);       // spins when dragged
+
+  // ---- Chrome letter "A" (extruded, bevelled) -------------------------------------------
+  var A = new THREE.Shape();
+  A.moveTo(-1.30, -1.55); A.lineTo(-0.30, 1.55); A.lineTo(0.30, 1.55); A.lineTo(1.30, -1.55);
+  A.lineTo(0.64, -1.55); A.lineTo(0.42, -0.92); A.lineTo(-0.42, -0.92); A.lineTo(-0.64, -1.55); A.lineTo(-1.30, -1.55);
+  var hole = new THREE.Path(); hole.moveTo(0, 0.72); hole.lineTo(0.24, -0.22); hole.lineTo(-0.24, -0.22); hole.lineTo(0, 0.72);
+  A.holes.push(hole);
+  var aGeo = new THREE.ExtrudeGeometry(A, { depth: 0.55, bevelEnabled: true, bevelThickness: 0.11, bevelSize: 0.1, bevelSegments: 8, curveSegments: 6 });
+  aGeo.translate(0, 0, -0.275);
+  var chrome = new THREE.MeshPhysicalMaterial({ color: 0xe9ecff, metalness: 1, roughness: 0.16, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 2.2 });
+  var letter = new THREE.Mesh(aGeo, chrome); piece.add(letter);
+
+  // ---- Glowing growth arrow (a tube that "draws" itself) ----------------------------------
+  var pts = [[-1.55, -1.05, 0.62], [-0.78, -0.45, 0.66], [-0.2, -0.95, 0.66], [0.55, -0.05, 0.66], [1.05, 0.38, 0.66], [1.75, 1.15, 0.62]]
+    .map(function (p) { return new THREE.Vector3(p[0], p[1], p[2]); });
+  var curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.3);
+  var TSEG = 160, RSEG = 18;
+  var tube = new THREE.Mesh(new THREE.TubeGeometry(curve, TSEG, 0.085, RSEG, false),
+    new THREE.MeshStandardMaterial({ color: 0x1b6b4e, emissive: 0x38ffb2, emissiveIntensity: 0.9, metalness: 0.2, roughness: 0.3 }));
+  piece.add(tube);
+  var tubeIndexCount = tube.geometry.index.count;
+  var head = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.5, 32),
+    new THREE.MeshStandardMaterial({ color: 0x2a8a62, emissive: 0xb6ff7a, emissiveIntensity: 1.0, metalness: 0.2, roughness: 0.3 }));
+  piece.add(head);
+  var up = new THREE.Vector3(0, 1, 0), tmpT = new THREE.Vector3();
+  function placeHead(u) {
+    var p = curve.getPoint(u); curve.getTangent(Math.min(u, 0.999), tmpT);
+    head.position.copy(p).addScaledVector(tmpT, 0.2); head.quaternion.setFromUnitVectors(up, tmpT);
+  }
+  var arrowGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex('rgba(120,255,190,.9)', 'rgba(60,255,170,.25)'),
+    blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.0 }));
+  arrowGlow.scale.set(1.8, 1.8, 1); piece.add(arrowGlow);
+
+  // ---- Gold ring + orbiting spark + halo ------------------------------------------------------
+  var goldMat = new THREE.MeshPhysicalMaterial({ color: 0xffb16b, metalness: 1, roughness: 0.16, clearcoat: 1, envMapIntensity: 1.8 });
+  var ring = new THREE.Mesh(new THREE.TorusGeometry(2.55, 0.06, 36, 200), goldMat); ring.rotation.set(1.05, 0.25, 0.1); stage.add(ring);
+  var ring2 = new THREE.Mesh(new THREE.TorusGeometry(2.35, 0.012, 12, 200), new THREE.MeshBasicMaterial({ color: 0xb7a8ff, transparent: true, opacity: 0.4 }));
+  ring2.rotation.set(1.3, -0.5, 0.2); stage.add(ring2);
+  var spark = new THREE.Mesh(new THREE.SphereGeometry(0.13, 32, 24), new THREE.MeshBasicMaterial({ color: 0xffe9b0 })); stage.add(spark);
+  var sparkGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex('rgba(255,225,160,1)', 'rgba(255,150,80,.35)'),
+    blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sparkGlow.scale.set(1.1, 1.1, 1); stage.add(sparkGlow);
+  var halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex('rgba(150,120,255,.9)', 'rgba(110,70,255,.22)'),
+    blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.55 })); halo.scale.set(9, 9, 1); halo.position.z = -1.5; stage.add(halo);
+
+  // ---- Floating chrome beads --------------------------------------------------------------------
+  var beads = [[0x4dffc9, 0.16, 0.0, 2.2], [0xff5fd2, 0.12, 2.1, 2.7], [0x7cc4ff, 0.14, 4.2, 3.1]].map(function (d) {
+    var m = new THREE.Mesh(new THREE.SphereGeometry(d[1], 40, 28), new THREE.MeshPhysicalMaterial({ color: d[0], metalness: 0.9, roughness: 0.1, clearcoat: 1, envMapIntensity: 1.8 }));
+    m.userData = { o: d[2], r: d[3] }; stage.add(m); return m;
+  });
+
+  // ---- Dust + stars -------------------------------------------------------------------------------
+  var N = small ? 150 : 300, dp = new Float32Array(N * 3), seed = new Float32Array(N);
+  for (var i = 0; i < N; i++) { dp[i * 3] = (Math.random() - 0.5) * 22; dp[i * 3 + 1] = (Math.random() - 0.5) * 11; dp[i * 3 + 2] = (Math.random() - 0.5) * 12 - 3; seed[i] = Math.random() * 6.28; }
+  var dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.BufferAttribute(dp, 3));
+  var dust = new THREE.Points(dg, new THREE.PointsMaterial({ map: glowTex('rgba(255,255,255,1)', 'rgba(190,180,255,.35)'), size: 0.17, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
+  scene.add(dust);
+
+  // ---- Layout: always fully inside the banner --------------------------------------------------
+  var visH = 1, visW = 1, wide = true, baseScale = 1, baseY = 0;
+  function resize() {
+    var w = wrap.clientWidth, h = wrap.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+    visH = 2 * Math.tan(THREE.MathUtils.degToRad(FOV / 2)) * DIST; visW = visH * camera.aspect; wide = w > 640;
+    baseScale = wide ? Math.min(1.0, visH * 0.74 / 3.9) : Math.min(0.46, visH * 0.30 / 3.9);
+    baseY = wide ? 0 : -visH * 0.25;
+    stage.position.set(wide ? visW * 0.26 : visW * 0.18, baseY, 0);
+  }
+  window.addEventListener('resize', resize); resize();
+
+  // ---- Interaction (mouse follows even outside the banner when the page allows) ---------------
+  var nx = 0.4, ny = 0, mx = 0.4, my = 0, inside = false, dragging = false, lastX = 0, spin = 0, spinVel = 0, boost = 0, drawStart = 0;
+  var host = window, fe = null;
+  try { if (window.parent && window.parent !== window && window.parent.document) { host = window.parent; fe = window.frameElement; } } catch (e) { host = window; fe = null; }
+  function point(e, fromHost) {
+    var r = wrap.getBoundingClientRect(), ox = 0, oy = 0;
+    if (fromHost && fe) { var f = fe.getBoundingClientRect(); ox = f.left; oy = f.top; }
+    var x = e.clientX - ox - r.left, y = e.clientY - oy - r.top;
+    inside = x >= 0 && y >= 0 && x <= r.width && y <= r.height;
+    nx = Math.max(-1.5, Math.min(1.5, (x / r.width) * 2 - 1)); ny = Math.max(-1.5, Math.min(1.5, (y / r.height) * 2 - 1));
+    cur.style.transform = 'translate(' + x + 'px,' + y + 'px)'; cur.classList.toggle('show', inside);
+  }
+  function onHostMove(e) { try { point(e, host !== window); } catch (err) {} }
+  host.addEventListener('mousemove', onHostMove);
+  window.addEventListener('touchmove', function (e) { if (e.touches && e.touches[0]) { point(e.touches[0], false); } }, { passive: true });
+  wrap.addEventListener('mouseleave', function () { if (host === window) { inside = false; cur.classList.remove('show'); } });
+  wrap.addEventListener('pointerdown', function (e) { dragging = true; lastX = e.clientX; cur.classList.add('down'); boost = 1; drawStart = -1; });
+  window.addEventListener('pointerup', function () { dragging = false; cur.classList.remove('down'); });
+  window.addEventListener('pointermove', function (e) { if (dragging) { spinVel = (e.clientX - lastX) * 0.012; lastX = e.clientX; } });
+  window.addEventListener('pagehide', function () { try { host.removeEventListener('mousemove', onHostMove); } catch (e) {} });
+
+  // ---- Loop -----------------------------------------------------------------------------------------------
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var visible = true, running = false, t0 = performance.now(), last = t0;
+  if ('IntersectionObserver' in window) { new IntersectionObserver(function (en) { visible = en[0].isIntersecting; if (visible) { last = performance.now(); start(); } }).observe(wrap); }
+  function ease(x) { return 1 - Math.pow(1 - x, 3); }
+  var CYCLE = 6.5;                       // arrow draws, glows, then redraws
+
+  function frame(now) {
+    running = false;
+    var dt = Math.min((now - last) / 1000, 0.05); last = now;
+    var t = reduce ? 20 : (now - t0) / 1000, intro = ease(Math.min(t / 1.6, 1));
+    if (drawStart === -1) { drawStart = t; }
+    mx += (nx - mx) * 0.07; my += (ny - my) * 0.07; boost = Math.max(0, boost - dt * 1.3);
+
+    // drag adds spin; after release it eases back so the A always settles facing the viewer
+    if (!dragging) { spinVel *= 0.94; var home = Math.round(spin / 6.2832) * 6.2832; spin += (home - spin) * 0.03; }
+    spin += spinVel;
+    piece.rotation.y = spin + Math.sin(t * 0.55) * 0.42;
+    tilt.rotation.x = THREE.MathUtils.lerp(tilt.rotation.x, my * 0.3, 0.08);
+    tilt.rotation.y = THREE.MathUtils.lerp(tilt.rotation.y, (mx - 0.4) * 0.45, 0.08);
+    stage.scale.setScalar(baseScale * (0.4 + 0.6 * intro));
+    stage.position.y = baseY + Math.sin(t * 1.15) * 0.1 - (1 - intro) * 2;
+
+    // arrow draw cycle
+    var ct = ((t - (drawStart > 0 ? drawStart : 0)) % CYCLE + CYCLE) % CYCLE;
+    var prog = reduce ? 1 : Math.min(ct / 2.2, 1), pe = ease(prog);
+    tube.geometry.setDrawRange(0, Math.max(6, Math.floor(tubeIndexCount * pe / 3) * 3));
+    head.visible = pe > 0.04; placeHead(Math.max(pe, 0.02));
+    var flash = reduce ? 0.3 : (ct > 2.2 && ct < 3.4 ? Math.sin((ct - 2.2) / 1.2 * Math.PI) : 0);
+    arrowGlow.position.copy(head.position); arrowGlow.material.opacity = 0.2 + flash * 0.7 + boost * 0.4;
+    tube.material.emissiveIntensity = 0.8 + flash * 0.9 + boost * 0.7; head.material.emissiveIntensity = 0.9 + flash * 1.0 + boost * 0.7;
+
+    // rings, spark, beads
+    ring.rotation.z = t * 0.22; ring.rotation.x = 1.05 + Math.sin(t * 0.4) * 0.08; ring2.rotation.z = -t * 0.12;
+    ring.scale.setScalar(intro); ring2.scale.setScalar(intro);
+    var sa = t * 0.9; ring.updateMatrix();
+    spark.position.set(Math.cos(sa) * 2.55, Math.sin(sa) * 2.55, 0).applyMatrix4(ring.matrix); sparkGlow.position.copy(spark.position);
+    beads.forEach(function (b, i) { var a = t * (0.35 + i * 0.1) + b.userData.o, r = b.userData.r;
+      b.position.set(Math.cos(a) * r, Math.sin(a * 1.3) * 1.2, Math.sin(a) * r * 0.45 - 0.5); b.scale.setScalar(intro); });
+    halo.material.opacity = 0.45 + Math.sin(t * 1.4) * 0.08 + boost * 0.2;
+
+    // cursor light moves the highlights over the metal
+    cursorLight.position.set(mx * visW * 0.5, -my * visH * 0.5, 3.4);
+    cursorLight.intensity = inside ? 4.8 : 2.4;
+
+    var dpa = dg.attributes.position.array;
+    for (var i = 0; i < N; i++) { dpa[i * 3 + 1] += Math.sin(t * 0.6 + seed[i]) * 0.0016; }
+    dg.attributes.position.needsUpdate = true; dust.position.x = -mx * 0.4; dust.position.y = my * 0.25;
+
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+    if (!reduce && visible) { start(); }
+  }
+  function start() { if (!running) { running = true; requestAnimationFrame(frame); } }
+  canvas.classList.add('on');
+  start();
+})();
+</script>
+"""
+
+LOGO_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="100%" height="100%" role="img" aria-label="Aziz Digital Marketer Agent">
+<title>Aziz Digital Marketer Agent</title><style>
+/* animation 1: growth arrow draws itself, then holds */
+.draw{stroke-dasharray:520;stroke-dashoffset:0;animation:draw 4.5s ease-in-out infinite}
+.head{animation:head 4.5s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes draw{0%{stroke-dashoffset:520}38%,92%{stroke-dashoffset:0}100%{stroke-dashoffset:0;opacity:.0}}
+@keyframes head{0%,34%{opacity:0;transform:scale(.4)}46%,92%{opacity:1;transform:scale(1)}100%{opacity:0}}
+/* animation 2: light sweep across the name */
+.shine{animation:shine 4.5s ease-in-out infinite}
+@keyframes shine{0%,30%{transform:translateX(-500px)}75%,100%{transform:translateX(1700px)}}
+/* animation 3: glowing ring pulse (the orbiting spark is SMIL below) */
+.pulse{animation:pulse 3s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style><defs>
+<linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe29a"/><stop offset=".5" stop-color="#ff7a3c"/><stop offset="1" stop-color="#d81b4a"/></linearGradient>
+<radialGradient id="disc" cx=".35" cy=".25" r=".95"><stop offset="0" stop-color="#3a2a8f"/><stop offset=".55" stop-color="#15103f"/><stop offset="1" stop-color="#07061a"/></radialGradient>
+<linearGradient id="aG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#b9acff"/></linearGradient>
+<linearGradient id="arrow" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#4dffc9"/><stop offset="1" stop-color="#b6ff7a"/></linearGradient>
+<linearGradient id="nameG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset=".6" stop-color="#d9d0ff"/><stop offset="1" stop-color="#ffb08a"/></linearGradient>
+<linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<filter id="glowS" filterUnits="userSpaceOnUse" x="-100" y="-100" width="800" height="800"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="22"/></filter>
+</defs>
+<g id="icon">
+  <circle cx="300" cy="300" r="250" fill="#ff6a3c" opacity=".30" filter="url(#soft)"/>
+  <circle cx="300" cy="300" r="238" fill="url(#disc)"/>
+  <circle cx="300" cy="300" r="238" fill="none" stroke="url(#ring)" stroke-width="14" class="pulse"/>
+  <circle cx="300" cy="300" r="214" fill="none" stroke="#ffffff" stroke-opacity=".10" stroke-width="2"/>
+  <!-- letter A -->
+  <path d="M170 438 L300 150 L430 438" fill="none" stroke="url(#aG)" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M170 438 L300 150" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="10" stroke-linecap="round"/>
+  <!-- growth arrow as the crossbar -->
+  <path class="draw" d="M205 392 L262 336 L312 366 L392 270" fill="none" stroke="url(#arrow)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+  <path class="head" d="M410 246 L340 262 L388 306 Z" fill="#b6ff7a" filter="url(#glow)"/>
+  <!-- spark -->
+  <path d="M300 96 L307 118 L329 125 L307 132 L300 154 L293 132 L271 125 L293 118 Z" fill="#fff" opacity=".95" filter="url(#glowS)"/>
+  <!-- orbiting spark -->
+  <g><circle cx="300" cy="62" r="11" fill="#ffe29a" filter="url(#glowS)"/>
+     <animateTransform attributeName="transform" type="rotate" from="0 300 300" to="360 300 300" dur="9s" repeatCount="indefinite"/></g>
+</g>
+</svg>"""
+
+LOGO_PAGE = ("<body style='margin:0;background:transparent;display:flex;justify-content:center;align-items:center'>"
+             "<div style='width:150px;height:150px'>" + LOGO_SVG + "</div></body>")
+
+CUSTOM_CSS = """
+<style>
+:root{--line:rgba(255,255,255,.12);--card:rgba(255,255,255,.055);--mut:#a9a3d6}
+.stApp{background:radial-gradient(70% 50% at 88% -10%,rgba(124,92,255,.30),transparent 60%),
+       radial-gradient(50% 40% at 0% 100%,rgba(255,106,60,.13),transparent 60%),#07061a;color:#ece9ff}
+header[data-testid="stHeader"]{background:transparent}
+.block-container{padding-top:1.4rem;max-width:1180px}
+[data-testid="stSidebar"]{background:linear-gradient(180deg,#0d0a2b 0%,#080718 100%);border-right:1px solid var(--line)}
+[data-testid="stWidgetLabel"] p{color:#cfc8ff;font-weight:600}
+div[data-baseweb="input"],div[data-baseweb="textarea"],div[data-baseweb="base-input"]{background:rgba(255,255,255,.06)!important;border-radius:12px!important}
+div[data-baseweb="input"],div[data-baseweb="textarea"]{border:1px solid var(--line)!important}
+input,textarea{color:#fff!important}
+.stButton>button[kind="primary"]{background:linear-gradient(90deg,#7c5cff,#ff6a3c);border:0;color:#fff;font-weight:700;border-radius:14px;
+  padding:.72rem 1.3rem;box-shadow:0 10px 30px rgba(124,92,255,.35);transition:transform .15s,box-shadow .15s}
+.stButton>button[kind="primary"]:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(255,106,60,.35);color:#fff}
+.stButton>button[kind="secondary"],.stDownloadButton>button,[data-testid="stLinkButton"] a{background:rgba(255,255,255,.07);
+  border:1px solid var(--line);border-radius:12px;color:#fff}
+.stTabs [data-baseweb="tab-list"]{gap:8px;border-bottom:0;flex-wrap:wrap}
+.stTabs [data-baseweb="tab"]{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:999px;padding:8px 18px;height:auto}
+.stTabs [aria-selected="true"]{background:linear-gradient(90deg,#7c5cff,#ff6a3c);border-color:transparent}
+.stTabs [data-baseweb="tab-highlight"],.stTabs [data-baseweb="tab-border"]{display:none}
+div[data-testid="stVerticalBlockBorderWrapper"]{background:var(--card);border:1px solid var(--line)!important;border-radius:20px;backdrop-filter:blur(10px)}
+.sec{display:flex;align-items:center;gap:10px;margin:22px 0 10px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--mut);font-weight:700}
+.sec i{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;font-style:normal;color:#fff;
+  background:linear-gradient(135deg,#7c5cff,#ff6a3c);font-size:13px}
+.rep-head{margin:18px 0 6px}
+.rep-head .eb{display:inline-block;padding:5px 12px;border-radius:999px;font-size:12px;color:#9dffd2;background:rgba(120,255,190,.1);
+  border:1px solid rgba(125,255,191,.3)}
+.rep-head h2{margin:10px 0 10px;font-size:clamp(26px,3.4vw,40px);letter-spacing:-.6px;
+  background:linear-gradient(90deg,#fff,#d8d0ff 60%,#ffb08a);-webkit-background-clip:text;background-clip:text;color:transparent}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0 6px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 18px}
+.kpi small{color:var(--mut);font-size:12px;letter-spacing:.7px;text-transform:uppercase}
+.kpi b{display:block;margin-top:6px;font-size:21px;color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:7px 14px;border-radius:999px;background:rgba(124,92,255,.15);border:1px solid rgba(160,140,255,.38);color:#eae6ff;font-size:13px;
+  animation:bob 6s ease-in-out infinite}
+.chip.o{background:rgba(255,106,60,.14);border-color:rgba(255,150,110,.4)}
+.chip.g{background:rgba(77,255,201,.12);border-color:rgba(77,255,201,.35)}
+.chip:nth-child(2n){animation-delay:-2s}.chip:nth-child(3n){animation-delay:-4s}
+@keyframes bob{50%{transform:translateY(-3px)}}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.info{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 18px}
+.info h4{margin:0 0 10px;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.9px}
+.info p{margin:0;color:#ece9ff;line-height:1.5}
+.weeks{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.week{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px}
+.week h4{margin:0 0 6px;font-size:13px;color:#ffb08a;letter-spacing:.6px}
+.day{display:flex;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.07);font-size:13.5px;line-height:1.4}
+.day span{color:#9d8cff;font-weight:700;min-width:30px}
+.contact{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;font-size:14px;line-height:1.9}
+.contact a{color:#9dffd2;text-decoration:none}
+.foot{text-align:center;color:var(--mut);font-size:13px;padding:10px 0 18px}
+@media(max-width:900px){.kpis{grid-template-columns:1fr 1fr}.weeks{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.grid2,.weeks{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.chip{animation:none}}
+/* Keep text readable even when the visitor's browser is in light mode */
+[data-testid="stSidebar"] p,[data-testid="stSidebar"] span,[data-testid="stSidebar"] label,[data-testid="stSidebar"] summary,
+[data-testid="stSidebar"] h1,[data-testid="stSidebar"] h2,[data-testid="stSidebar"] h3,
+.stMarkdown p,[data-testid="stCaptionContainer"],[data-testid="stRadio"] label p,[data-testid="stRadio"] label div,
+[data-testid="stExpander"] summary p,[data-testid="stExpander"] summary span,[data-testid="stCheckbox"] p{color:#ece9ff}
+.stTabs [data-baseweb="tab"] p,.stTabs [data-baseweb="tab"] div{color:#ece9ff}
+.stTabs [aria-selected="true"] p,.stTabs [aria-selected="true"] div{color:#fff!important;font-weight:700}
+div[data-baseweb="input"] input,div[data-baseweb="base-input"] input,div[data-baseweb="textarea"] textarea{background:transparent!important;color:#fff!important}
+div[data-baseweb="input"] button{background:transparent!important;color:#fff!important}
+div[data-baseweb="select"]>div{background:rgba(255,255,255,.06)!important;border:1px solid var(--line)!important;border-radius:12px!important;color:#fff!important}
+div[data-baseweb="select"] *{color:#fff!important}
+[data-testid="stExpander"] details{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px}
+[data-testid="stCode"],[data-testid="stCode"] pre,.stCodeBlock pre{background:rgba(255,255,255,.05)!important;color:#ece9ff!important;border-radius:14px}
+[data-testid="stCode"] code,.stCodeBlock code{color:#ece9ff!important}
+</style>
+"""
+
+
+# ---------------------------------------------------------------------------
+# UI helpers
+# ---------------------------------------------------------------------------
+def chips(items, cls: str = "") -> str:
+    """Bubble-style tags. Everything is HTML-escaped."""
+    return '<div class="chips">' + "".join(f'<span class="chip {cls}">{escape(str(i))}</span>' for i in items) + "</div>"
+
+
+def info_card(title: str, body_html: str) -> str:
+    return f'<div class="info"><h4>{escape(title)}</h4>{body_html}</div>'
+
+
+def section(num: int, text: str) -> None:
+    st.markdown(f'<div class="sec"><i>{num}</i>{escape(text)}</div>', unsafe_allow_html=True)
+
+
 def render_sidebar_header() -> None:
     with st.sidebar:
-        if os.path.exists(LOGO_FILE):
-            st.image(LOGO_FILE, width=220)
-        st.title(AGENCY)
-        st.info(f"📞 0{MY_WA[2:]}\n\n📍 {DEFAULT_CITY}\n\n☁️ Cloud LIVE")
-        st.subheader("Packages")
+        if hasattr(st, "iframe"):
+            st.iframe(LOGO_PAGE, height=160)
+        else:
+            import streamlit.components.v1 as components  # older Streamlit only
+
+            components.html(LOGO_PAGE, height=160)
+        st.markdown(f"### {AGENCY}")
+        st.markdown(
+            '<div class="contact">'
+            f'📞 <a href="tel:0{MY_WA[2:]}">0{MY_WA[2:]}</a><br>'
+            f"📍 {escape(DEFAULT_CITY)}<br>☁️ Cloud LIVE</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="sec">Packages</div>', unsafe_allow_html=True)
         for pkg in PACKAGES:
             with st.expander(f"{pkg.name} - Rs {pkg.price:,}"):
-                for item in pkg.items:
-                    st.write(f"• {item}")
+                st.markdown(chips(pkg.items, "g"), unsafe_allow_html=True)
 
 
 def render_hero() -> None:
     """Show the 3D banner. st.iframe on current Streamlit, components.html on older versions."""
     if hasattr(st, "iframe"):
-        st.iframe(HERO_HTML, height=340)
+        st.iframe(HERO_HTML, height=360)
     else:
         import streamlit.components.v1 as components  # older Streamlit only
 
-        components.html(HERO_HTML, height=340)
+        components.html(HERO_HTML, height=360)
 
 
 def _load_history_pick() -> None:
@@ -890,7 +992,7 @@ def render_sidebar_history() -> None:
     if not history:
         return
     with st.sidebar:
-        st.subheader("Pichli reports")
+        st.markdown('<div class="sec">Pichli reports</div>', unsafe_allow_html=True)
         st.selectbox(
             "Reload a report",
             [r.label for r in history],
@@ -902,34 +1004,59 @@ def render_sidebar_history() -> None:
         )
 
 
+def _slug(text: str) -> str:
+    return re.sub(r"[^A-Za-z0-9]+", "_", text).strip("_") or "report"
+
+
 def render_report(r: Report) -> None:
-    st.success(f"Report Ready for {r.business}")
+    st.markdown(
+        '<div class="rep-head"><span class="eb">Report ready</span>'
+        f"<h2>{escape(r.business)}</h2>"
+        + chips([r.niche.name, r.city], "o")
+        + "</div>",
+        unsafe_allow_html=True,
+    )
     if not r.matched:
         st.warning("Niche pehchana nahi gaya, general plan diya gaya hai. Business name mein niche ka "
                    "lafz likho (jaise 'clothes', 'salon', 'clinic').")
 
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Niche", r.niche.name)
-    k2.metric("Package", f"{r.package.name}")
-    k3.metric("Price / month", f"Rs {r.package.price:,}")
-    k4.metric("Posts planned", len(r.plan))
+    st.markdown(
+        '<div class="kpis">'
+        f'<div class="kpi"><small>Niche</small><b>{escape(r.niche.name)}</b></div>'
+        f'<div class="kpi"><small>Package</small><b>{escape(r.package.name)}</b></div>'
+        f'<div class="kpi"><small>Price / month</small><b>Rs {r.package.price:,}</b></div>'
+        f'<div class="kpi"><small>Posts planned</small><b>{len(r.plan)}</b></div></div>',
+        unsafe_allow_html=True,
+    )
 
     tab_research, tab_plan, tab_pitch, tab_ai = st.tabs(
-        ["Research", "30-Day Content Plan", "WhatsApp Pitch", "🤖 AI Agent"])
+        ["Research", "30-Day Plan", "WhatsApp Pitch", "🤖 AI Agent"])
 
     with tab_research:
-        left, right = st.columns(2)
-        with left:
-            st.write(f"**Audience:** {r.niche.audience}")
-            st.write(f"**Platforms:** {', '.join(r.niche.platforms)}")
-            st.write(f"**Offer idea:** {r.niche.hook}")
-        with right:
-            st.write(f"**Ad budget split:** {r.niche.ad_split}")
-            st.write(f"**Hashtags:** {' '.join(r.niche.hashtags)}")
-            st.write("**Package includes:** " + ", ".join(r.package.items))
+        st.markdown(
+            '<div class="grid2">'
+            + info_card("Audience", f"<p>{escape(r.niche.audience)}</p>")
+            + info_card("Offer idea", f"<p>{escape(r.niche.hook)}</p>")
+            + info_card("Platforms", chips(r.niche.platforms))
+            + info_card("Ad budget split", f"<p>{escape(r.niche.ad_split)}</p>")
+            + info_card("Hashtags", chips(r.niche.hashtags, "o"))
+            + info_card("Package includes", chips(r.package.items, "g"))
+            + "</div>",
+            unsafe_allow_html=True,
+        )
 
     with tab_plan:
-        st.table({"Day": [d for d, _ in r.plan], "Content": [c for _, c in r.plan]})
+        weeks: dict[str, list[tuple[str, str]]] = {}
+        for label, idea in r.plan:
+            wk, day = label.split(" - ")
+            weeks.setdefault(wk, []).append((day, idea))
+        cards = "".join(
+            f'<div class="week"><h4>{escape(wk.upper())}</h4>'
+            + "".join(f'<div class="day"><span>{escape(d)}</span>{escape(i)}</div>' for d, i in days)
+            + "</div>"
+            for wk, days in weeks.items()
+        )
+        st.markdown(f'<div class="weeks">{cards}</div>', unsafe_allow_html=True)
         st.download_button("Download plan (.csv)", plan_to_csv(r.plan),
                            file_name=f"{_slug(r.business)}_content_plan.csv", mime="text/csv")
 
@@ -945,11 +1072,6 @@ def render_report(r: Report) -> None:
         render_ai_tab(r)
 
 
-
-def _slug(text: str) -> str:
-    return re.sub(r"[^A-Za-z0-9]+", "_", text).strip("_") or "report"
-
-
 # ---------------------------------------------------------------------------
 # Page
 # ---------------------------------------------------------------------------
@@ -958,19 +1080,22 @@ def main() -> None:
     render_sidebar_header()
     render_hero()
 
-    c1, c2, c3 = st.columns([2, 1, 1])
-    business = c1.text_input("Business Name:", placeholder="Peshawar Clothes Shop", max_chars=60)
-    city = c2.text_input("City:", value=DEFAULT_CITY, max_chars=40)
-    budget = c3.number_input("Client monthly budget (Rs):", min_value=0, value=15000, step=5000)
+    section(1, "Client ki details")
+    with st.container(border=True):
+        c1, c2, c3 = st.columns([2, 1, 1])
+        business = c1.text_input("Business Name:", placeholder="Peshawar Clothes Shop", max_chars=60)
+        city = c2.text_input("City:", value=DEFAULT_CITY, max_chars=40)
+        budget = c3.number_input("Client monthly budget (Rs):", min_value=0, value=15000, step=5000)
 
-    c4, c5 = st.columns([1, 1])
-    client_raw = c4.text_input("Client WhatsApp number (optional):", placeholder="0333 1234567")
-    lang = c5.radio("Pitch language:", ["Roman Urdu", "English"], horizontal=True)
+        c4, c5 = st.columns([1, 1])
+        client_raw = c4.text_input("Client WhatsApp number (optional):", placeholder="0333 1234567")
+        lang = c5.radio("Pitch language:", ["Roman Urdu", "English"], horizontal=True)
 
-    if budget < PACKAGES[0].price:
-        st.caption(f"Note: sab se chota package Rs {PACKAGES[0].price:,} ka hai.")
+        if budget < PACKAGES[0].price:
+            st.caption(f"Note: sab se chota package Rs {PACKAGES[0].price:,} ka hai.")
+        go = st.button("Generate PRO Report", type="primary", use_container_width=True)
 
-    if st.button("Generate PRO Report", type="primary"):
+    if go:
         name = business.strip()
         if not name:
             st.error("Business Name likho!")
@@ -985,15 +1110,16 @@ def main() -> None:
             history = st.session_state.setdefault("history", [])
             history.insert(0, report)
             del history[MAX_HISTORY:]
-            st.balloons()
+            st.toast("Report tayyar hai ✅")
 
     result = st.session_state.get("result")
     if result:
+        section(2, "Aap ki report")
         render_report(result)
 
     render_sidebar_history()
-    st.divider()
-    st.caption(f"Powered by {AGENCY} | 0{MY_WA[2:]} | {DEFAULT_CITY}")
+    st.markdown(f'<div class="foot">Powered by {escape(AGENCY)} | 0{MY_WA[2:]} | {escape(DEFAULT_CITY)}</div>',
+                unsafe_allow_html=True)
 
 
 main()
